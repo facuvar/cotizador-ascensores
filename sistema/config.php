@@ -1,9 +1,13 @@
 <?php
-// Detectar entorno automáticamente
-$isRailway = isset($_ENV['RAILWAY_ENVIRONMENT']) || 
-             isset($_ENV['PORT']) || 
-             strpos($_SERVER['HTTP_HOST'] ?? '', 'railway.app') !== false ||
-             strpos($_SERVER['HTTP_HOST'] ?? '', 'up.railway.app') !== false;
+// Detección robusta de entorno
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$forceLocal = getenv('FORCE_LOCAL') === '1';
+
+$isRailway = !$forceLocal && (
+    isset($_ENV['RAILWAY_ENVIRONMENT']) ||
+    strpos($host, 'railway.app') !== false ||
+    strpos($host, 'up.railway.app') !== false
+);
 
 define('IS_RAILWAY', $isRailway);
 

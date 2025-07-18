@@ -142,6 +142,8 @@
             justify-content: space-between;
             cursor: pointer;
             transition: background-color 0.2s ease;
+            background: #4f4f4f;
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         }
 
         .category-header:hover {
@@ -188,8 +190,16 @@
         }
 
         .expand-icon {
-            color: var(--text-secondary);
-            transition: transform 0.3s ease;
+            color: #000;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            background: #fff;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
         }
 
         .expand-icon svg {
@@ -1141,7 +1151,7 @@
                         const checkbox = element.querySelector('.option-checkbox');
                         if (checkbox) {
                             const optionId = checkbox.getAttribute('data-option-id');
-                            console.log('Opción a procesar:', optionId);
+                            console.log('Procesando opción directa:', optionId);
                             if (optionId) {
                                 toggleOption(parseInt(optionId), checkbox);
                             }

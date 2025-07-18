@@ -4,26 +4,6 @@
  * Funciona tanto para Railway como para entorno local
  */
 
-// Verificar que las constantes de configuración estén definidas
-if (!defined('DB_HOST')) {
-    // Buscar archivo de configuración
-    $configPaths = [
-        __DIR__ . '/../config.php',           // Railway (raíz del proyecto)
-        __DIR__ . '/../sistema/config.php',   // Local (dentro de sistema)
-    ];
-    
-    foreach ($configPaths as $configPath) {
-        if (file_exists($configPath)) {
-            require_once $configPath;
-            break;
-        }
-    }
-    
-    if (!defined('DB_HOST')) {
-        die('Error: No se pudo cargar la configuración de la base de datos');
-    }
-}
-
 try {
     // Crear conexión PDO
     $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=utf8mb4";

@@ -10,7 +10,7 @@
         :root {
             /* Colores de la nueva paleta */
             --color-coral: #4f4f4f;      /* Nuevo color principal */
-            --color-dark-gray: #2D262E;  /* 45, 38, 46 - Gris oscuro */
+            --color-dark-gray: #4f4f4f;  /* 45, 38, 46 - Gris oscuro (actualizado) */
             --color-white: #FFFFFF;      /* 255, 255, 255 - Blanco */
             --color-brown-gray: #7B6A6B; /* 123, 106, 107 - Gris marrón */
             --color-dark-green: #392D2E; /* 57, 45, 46 - Gris verdoso */
@@ -43,7 +43,7 @@
 
         /* Ajustes específicos para el cotizador */
         body {
-            background: linear-gradient(135deg, rgba(45, 38, 46, 0.8) 0%, rgba(57, 45, 46, 0.8) 100%), url('assets/images/back.jpg');
+            background: linear-gradient(135deg, rgba(45, 38, 46, 0.8) 0%, rgba(57, 45, 46, 0.8) 100%), url('assets/images/back.webp');
             background-size: cover;
             background-position: center;
             background-attachment: fixed;
@@ -156,7 +156,7 @@
             justify-content: space-between;
             cursor: pointer;
             transition: background-color 0.2s ease;
-            background: var(--color-dark-gray);
+            background: #4f4f4f;
             border-radius: var(--radius-lg) var(--radius-lg) 0 0;
         }
 
@@ -205,10 +205,10 @@
         }
 
         .expand-icon {
-            color: var(--color-white);
+            color: #000;
             opacity: 0.8;
             transition: all 0.3s ease;
-            background: #4f4f4f;
+            background: #fff;
             width: 32px;
             height: 32px;
             display: flex;
@@ -641,7 +641,7 @@
     <header class="public-header">
         <div class="header-content">
             <div class="logo-section">
-                <img src="assets/images/logo-company.png" alt="Logo de la Empresa" class="company-logo">
+                <img src="assets/images/logo-empresa.png" alt="Logo de la Empresa" class="company-logo">
             </div>
             
             <div class="header-actions">

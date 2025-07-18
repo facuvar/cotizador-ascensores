@@ -16,11 +16,17 @@ error_log("REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? 'No definido'));
 error_log("SCRIPT_FILENAME: " . ($_SERVER['SCRIPT_FILENAME'] ?? 'No definido'));
 error_log("DOCUMENT_ROOT: " . ($_SERVER['DOCUMENT_ROOT'] ?? 'No definido'));
 
-// Detectar Railway de manera más robusta
-$isRailway = (getenv('RAILWAY_ENVIRONMENT') === 'production' || 
-             getenv('RAILWAY_ENVIRONMENT') === 'true' || 
-             isset($_ENV['RAILWAY_ENVIRONMENT']) ||
-             strpos($_SERVER['HTTP_HOST'] ?? '', 'railway.app') !== false);
+// Detección robusta de entorno
+$host = $_SERVER['HTTP_HOST'] ?? '';
+$forceLocal = getenv('FORCE_LOCAL') === '1';
+
+$isRailway = !$forceLocal && (
+    isset($_ENV['RAILWAY_ENVIRONMENT']) ||
+    strpos($host, 'railway.app') !== false ||
+    strpos($host, 'up.railway.app') !== false
+);
+
+define('IS_RAILWAY', $isRailway);
 
 // Log detallado del entorno
 error_log("=== VARIABLES DE ENTORNO ===");
@@ -73,11 +79,11 @@ if ($isRailway) {
 }
 
 // Definir constantes de base de datos
-define('DB_HOST', 'mysql.railway.internal');
-define('DB_USER', 'root');
-define('DB_PASS', 'bnTRdfPtPcxXnGEawcKoPxfzQSkIClhs');
-define('DB_NAME', 'railway');
-define('DB_PORT', 3306);
+define('DB_HOST', $db_host);
+define('DB_USER', $db_user);
+define('DB_PASS', $db_pass);
+define('DB_NAME', $db_name);
+define('DB_PORT', $db_port);
 
 // ========================================
 // FUNCIÓN DE CONEXIÓN PDO
