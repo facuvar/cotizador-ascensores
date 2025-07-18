@@ -18,6 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($username === ADMIN_USER && password_verify($password, ADMIN_PASS)) {
         // Login exitoso
         $_SESSION['admin_logged_in'] = true;
+        $_SESSION['is_demo'] = false;
+        redirect(SITE_URL . '/admin/index.php');
+    } elseif ($username === DEMO_USER && password_verify($password, DEMO_PASS)) {
+        // Login demo solo lectura
+        $_SESSION['admin_logged_in'] = true;
+        $_SESSION['is_demo'] = true;
         redirect(SITE_URL . '/admin/index.php');
     } else {
         // Credenciales incorrectas

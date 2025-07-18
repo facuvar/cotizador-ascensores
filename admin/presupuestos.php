@@ -43,33 +43,45 @@ foreach ($dbPaths as $dbPath) {
 $presupuestos = [];
 $filtro = $_GET['filtro'] ?? 'todos';
 $busqueda = $_GET['busqueda'] ?? '';
+$pagina = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
+$por_pagina = 10;
+$total_presupuestos = 0;
 
 try {
     $db = Database::getInstance();
     $conn = $db->getConnection();
     
-    $query = "SELECT * FROM presupuestos WHERE 1=1";
-    
+    $query_base = "SELECT * FROM presupuestos WHERE 1=1";
+    $query_count = "SELECT COUNT(*) as total FROM presupuestos WHERE 1=1";
+    $where = "";
     // Aplicar filtros
     if ($busqueda) {
-        $query .= " AND (cliente_nombre LIKE '%$busqueda%' OR cliente_email LIKE '%$busqueda%' OR id = '$busqueda')";
+        $where .= " AND (cliente_nombre LIKE '%$busqueda%' OR cliente_email LIKE '%$busqueda%' OR id = '$busqueda')";
     }
-    
     switch ($filtro) {
         case 'hoy':
-            $query .= " AND DATE(created_at) = CURDATE()";
+            $where .= " AND DATE(created_at) = CURDATE()";
             break;
         case 'semana':
-            $query .= " AND created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+            $where .= " AND created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
             break;
         case 'mes':
-            $query .= " AND MONTH(created_at) = MONTH(CURRENT_DATE())";
+            $where .= " AND MONTH(created_at) = MONTH(CURRENT_DATE())";
             break;
     }
-    
-    $query .= " ORDER BY created_at DESC";
-    
-    $result = $conn->query($query);
+    $query_base .= $where . " ORDER BY created_at DESC";
+    $query_count .= $where;
+
+    // Obtener total de presupuestos para paginación
+    $result_count = $conn->query($query_count);
+    if ($result_count && $row = $result_count->fetch_assoc()) {
+        $total_presupuestos = intval($row['total']);
+    }
+    $total_paginas = max(1, ceil($total_presupuestos / $por_pagina));
+    $offset = ($pagina - 1) * $por_pagina;
+    $query_paginada = $query_base . " LIMIT $por_pagina OFFSET $offset";
+
+    $result = $conn->query($query_paginada);
     if ($result) {
         while ($row = $result->fetch_assoc()) {
             $presupuestos[] = $row;
@@ -396,6 +408,11 @@ $stats = [
                 min-width: 650px;
             }
         }
+        .btn-disabled, .btn:disabled {
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 <body>
@@ -446,15 +463,15 @@ $stats = [
             <header class="dashboard-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: var(--spacing-lg) var(--spacing-xl);">
                 <div class="header-grid" style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
-                        <h2 class="header-title" style="font-size: var(--text-lg); font-weight: 600;">Presupuestos</h2>
+                        <h2 class="header-title" style="font-size: var(--text-lg); font-weight: 600;">Presupuestos
+<?php if (!empty($_SESSION['is_demo'])): ?>
+    <span style="color: #fff; font-weight: 600; font-size: 1rem; margin-left: 1.5rem;">Modo Demo - Las acciones se encuentran deshabilitadas</span>
+<?php endif; ?>
+</h2>
                         <p class="header-subtitle" style="font-size: var(--text-sm); color: var(--text-secondary);">Gestiona todos los presupuestos generados</p>
                     </div>
                     
                     <div class="header-actions" style="display: flex; gap: var(--spacing-md);">
-                        <button class="btn btn-secondary" onclick="exportarPresupuestos()">
-                            <span id="export-icon"></span>
-                            Exportar
-                        </button>
                         <a href="../cotizador.php" class="btn btn-primary" target="_blank">
                             <span id="new-icon"></span>
                             Nuevo Presupuesto
@@ -621,22 +638,13 @@ $stats = [
                             </div> -->
                             <div class="table-cell" style="padding-right: var(--spacing-lg); min-width: 150px;">
                                 <div style="display: flex; gap: 6px; justify-content: flex-start; flex-wrap: nowrap; width: 100%; min-width: 140px;">
-                                    <button class="btn btn-sm btn-secondary" 
-                                            onclick="verPresupuesto(<?php echo $presupuesto['id']; ?>)"
-                                            title="Ver detalle"
-                                            style="min-width: 32px; width: 32px; height: 32px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <button class="btn btn-sm btn-secondary" onclick="verPresupuesto(<?php echo $presupuesto['id']; ?>)" title="Ver detalle">
                                         <span id="view-icon-<?php echo $presupuesto['id']; ?>"></span>
                                     </button>
-                                    <button class="btn btn-sm btn-secondary" 
-                                            onclick="descargarPDF(<?php echo $presupuesto['id']; ?>)"
-                                            title="Descargar PDF"
-                                            style="min-width: 32px; width: 32px; height: 32px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <button class="btn btn-sm btn-secondary" onclick="descargarPDF(<?php echo $presupuesto['id']; ?>)" title="Descargar PDF">
                                         <span id="pdf-icon-<?php echo $presupuesto['id']; ?>"></span>
                                     </button>
-                                    <button class="btn btn-sm btn-secondary" 
-                                            onclick="confirmarEliminar(<?php echo $presupuesto['id']; ?>)"
-                                            title="Eliminar presupuesto"
-                                            style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: #ef4444; min-width: 32px; width: 32px; height: 32px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                    <button class="btn btn-sm btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" onclick="confirmarEliminar(<?php echo $presupuesto['id']; ?>)" title="Eliminar presupuesto" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                         <span id="delete-icon-<?php echo $presupuesto['id']; ?>"></span>
                                     </button>
                                 </div>
@@ -648,13 +656,17 @@ $stats = [
                 </div>
 
                 <!-- Paginación (simulada) -->
-                <?php if (count($presupuestos) > 0): ?>
+                <?php if ($total_paginas > 1): ?>
                 <div class="pagination">
-                    <a href="#" class="page-link active">1</a>
-                    <a href="#" class="page-link">2</a>
-                    <a href="#" class="page-link">3</a>
-                    <span class="page-link">...</span>
-                    <a href="#" class="page-link">10</a>
+                    <?php if ($pagina > 1): ?>
+                        <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $pagina - 1])); ?>" class="page-link">&laquo; Anterior</a>
+                    <?php endif; ?>
+                    <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                        <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $i])); ?>" class="page-link<?php if ($i == $pagina) echo ' active'; ?>"><?php echo $i; ?></a>
+                    <?php endfor; ?>
+                    <?php if ($pagina < $total_paginas): ?>
+                        <a href="?<?php echo http_build_query(array_merge($_GET, ['pagina' => $pagina + 1])); ?>" class="page-link">Siguiente &raquo;</a>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>
@@ -663,50 +675,44 @@ $stats = [
 
     <script src="../assets/js/modern-icons.js"></script>
     <script>
-        // Cargar iconos
-        document.addEventListener('DOMContentLoaded', function() {
-            // Sidebar
-            document.getElementById('logo-icon').innerHTML = modernUI.getIcon('chart');
-            document.getElementById('nav-dashboard-icon').innerHTML = modernUI.getIcon('dashboard');
-            document.getElementById('nav-data-icon').innerHTML = modernUI.getIcon('settings');
-            document.getElementById('nav-quotes-icon').innerHTML = modernUI.getIcon('document');
-            
-            document.getElementById('nav-prices-icon').innerHTML = modernUI.getIcon('dollar');
-            document.getElementById('nav-calculator-icon').innerHTML = modernUI.getIcon('cart');
-            document.getElementById('nav-logout-icon').innerHTML = modernUI.getIcon('logout');
-            
-            // Header
-            document.getElementById('export-icon').innerHTML = modernUI.getIcon('download');
-            document.getElementById('new-icon').innerHTML = modernUI.getIcon('add');
-            
-            // Stats
-            document.getElementById('stat-total-icon').innerHTML = modernUI.getIcon('document', 'icon-lg');
-            document.getElementById('stat-money-icon').innerHTML = modernUI.getIcon('dollar', 'icon-lg');
-            document.getElementById('stat-avg-icon').innerHTML = modernUI.getIcon('chart', 'icon-lg');
-            
-            // Search
-            document.getElementById('search-icon').innerHTML = modernUI.getIcon('search');
-            
-            // Empty state
-            const emptyIcon = document.getElementById('empty-new-icon');
-            if (emptyIcon) emptyIcon.innerHTML = modernUI.getIcon('add');
-            
-            // Table icons
-            <?php foreach ($presupuestos as $presupuesto): ?>
-            // document.getElementById('status-icon-<?php echo $presupuesto['id']; ?>').innerHTML = modernUI.getIcon('clock', 'icon-sm');
-            document.getElementById('view-icon-<?php echo $presupuesto['id']; ?>').innerHTML = modernUI.getIcon('eye', 'icon-sm');
-            document.getElementById('pdf-icon-<?php echo $presupuesto['id']; ?>').innerHTML = modernUI.getIcon('pdf', 'icon-sm');
-            document.getElementById('delete-icon-<?php echo $presupuesto['id']; ?>').innerHTML = modernUI.getIcon('trash', 'icon-sm');
-            <?php endforeach; ?>
-            
-            // Iconos para alertas
-            if (document.getElementById('success-icon')) {
-                document.getElementById('success-icon').innerHTML = modernUI.getIcon('check-circle');
-            }
-            if (document.getElementById('error-icon')) {
-                document.getElementById('error-icon').innerHTML = modernUI.getIcon('alert-circle');
-            }
-        });
+function safeSetIcon(id, icon, size) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = modernUI.getIcon(icon, size);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar
+    safeSetIcon('logo-icon', 'chart');
+    safeSetIcon('nav-dashboard-icon', 'dashboard');
+    safeSetIcon('nav-data-icon', 'settings');
+    safeSetIcon('nav-quotes-icon', 'document');
+    safeSetIcon('nav-prices-icon', 'dollar');
+    safeSetIcon('nav-calculator-icon', 'cart');
+    safeSetIcon('nav-logout-icon', 'logout');
+    // Header
+    safeSetIcon('new-icon', 'add');
+    // Stats
+    safeSetIcon('stat-total-icon', 'document');
+    safeSetIcon('stat-money-icon', 'dollar');
+    safeSetIcon('stat-avg-icon', 'chart');
+    // Search
+    safeSetIcon('search-icon', 'search');
+    // Table actions
+    document.querySelectorAll('[id^="view-icon-"]').forEach(function(el) {
+        el.innerHTML = modernUI.getIcon('eye', 'icon-sm');
+    });
+    document.querySelectorAll('[id^="pdf-icon-"]').forEach(function(el) {
+        el.innerHTML = modernUI.getIcon('pdf', 'icon-sm');
+    });
+    document.querySelectorAll('[id^="delete-icon-"]').forEach(function(el) {
+        el.innerHTML = modernUI.getIcon('delete', 'icon-sm');
+    });
+    // Empty state
+    safeSetIcon('empty-new-icon', 'add');
+    // Iconos para alertas
+    safeSetIcon('success-icon', 'check-circle');
+    safeSetIcon('error-icon', 'alert-circle');
+});
 
         function verPresupuesto(id) {
             window.location.href = `ver_presupuesto_moderno.php?id=${id}`;

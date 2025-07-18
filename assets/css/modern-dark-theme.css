@@ -147,13 +147,16 @@ body {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: #e0e6ed;
+  color: #1a2636;
+  border: 1.5px solid #8ca0b3;
+  font-weight: 600;
 }
 
 .btn-secondary:hover {
-  background: var(--bg-hover);
+  background: #cfd8e3;
+  color: #111b2b;
+  border-color: #5c6e85;
 }
 
 .btn-success {

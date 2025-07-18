@@ -67,6 +67,10 @@ foreach ($requiredFiles as $name => $path) {
 if (!defined('ADMIN_USER')) define('ADMIN_USER', 'admin');
 if (!defined('ADMIN_PASS')) define('ADMIN_PASS', password_hash('admin123', PASSWORD_DEFAULT));
 
+// Credenciales de usuario demo
+if (!defined('DEMO_USER')) define('DEMO_USER', 'demo');
+if (!defined('DEMO_PASS')) define('DEMO_PASS', '$2y$10$rU/bkB5/GlpwPLDO.1WG.ecco44nlZ0P6S1QlfmeIZggmxr74AefW');
+
 // Configuración de zona horaria
 date_default_timezone_set('America/Argentina/Buenos_Aires');
 

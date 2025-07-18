@@ -346,6 +346,5 @@ window.modernUI = {
   formatNumber,
   formatCurrency,
   formatDate,
-  showToast,
-  createSimpleChart
+  showToast
 }; 

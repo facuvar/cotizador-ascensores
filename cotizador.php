@@ -147,6 +147,7 @@
         .category-card.active {
             border-color: var(--accent-primary);
             box-shadow: 0 0 0 1px var(--accent-primary);
+            background: #333333;
         }
 
         .category-header {
@@ -252,7 +253,9 @@
         }
 
         .option-item:hover {
-            background: var(--bg-hover);
+            background-color: #4f4f4f;
+            border-color: #ddd;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
         .option-checkbox {

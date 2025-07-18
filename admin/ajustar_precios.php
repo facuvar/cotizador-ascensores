@@ -408,6 +408,11 @@ try {
             color: var(--accent-info);
             margin-bottom: var(--spacing-sm);
         }
+        .btn-disabled, .btn:disabled {
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 <body>
@@ -458,7 +463,11 @@ try {
             <header class="dashboard-header">
                 <div class="header-grid">
                     <div>
-                        <h2 class="header-title">Ajustar Precios</h2>
+                        <h2 class="header-title">Ajustar Precios
+<?php if (!empty($_SESSION['is_demo'])): ?>
+    <span style="color: #fff; font-weight: 600; font-size: 1rem; margin-left: 1.5rem;">Modo Demo - Las acciones se encuentran deshabilitadas</span>
+<?php endif; ?>
+</h2>
                         <p class="header-subtitle">Incrementar o disminuir precios masivamente</p>
                     </div>
                     
@@ -537,7 +546,7 @@ try {
                     </small>
                 </div>
                 
-                <button type="submit" name="ajustar_precios" class="btn btn-primary btn-lg">
+                <button type="submit" name="ajustar_precios" class="btn btn-primary btn-lg<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                     Aplicar Ajuste
                 </button>
             </form>

@@ -40,6 +40,10 @@ define('MAIN_COLOR', '#e50009');
 define('ADMIN_USER', 'admin');
 define('ADMIN_PASS', '$2y$10$szOr0zBbR/0iUpJbHGzVgOyMS3vr7/3DbqFnOJTJRKZOwjyWO/vjm'); // admin123
 
+// Usuario demo solo lectura
+define('DEMO_USER', 'demo');
+define('DEMO_PASS', '$2y$10$rU/bkB5/GlpwPLDO.1WG.ecco44nlZ0P6S1QlfmeIZggmxr74AefW'); // demo123
+
 // Configuración de email (opcional)
 define('SMTP_HOST', '');
 define('SMTP_PORT', 587);

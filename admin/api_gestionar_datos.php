@@ -128,6 +128,13 @@ if (!function_exists('getDBConnection') && !class_exists('Database')) {
     }
 }
 
+// Bloquear acciones de modificación para usuario demo
+if (!empty($_SESSION['is_demo'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'El usuario demo no puede modificar datos.']);
+    exit;
+}
+
 // Configurar cabeceras para JSON
 header('Content-Type: application/json');
 

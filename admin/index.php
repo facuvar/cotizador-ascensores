@@ -36,10 +36,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$isLoggedIn) {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
     
-    if (defined('ADMIN_USER') && defined('ADMIN_PASS')) {
+    if (defined('ADMIN_USER') && defined('ADMIN_PASS') && defined('DEMO_USER') && defined('DEMO_PASS')) {
         if ($username === ADMIN_USER && password_verify($password, ADMIN_PASS)) {
             $_SESSION['admin_logged_in'] = true;
             $_SESSION['admin_user'] = $username;
+            $_SESSION['is_demo'] = false;
+            $_SESSION['login_time'] = time();
+            $isLoggedIn = true;
+        } elseif ($username === DEMO_USER && password_verify($password, DEMO_PASS)) {
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_user'] = $username;
+            $_SESSION['is_demo'] = true;
             $_SESSION['login_time'] = time();
             $isLoggedIn = true;
         } else {
@@ -110,7 +117,7 @@ if ($isLoggedIn) {
             
             // Datos para gráfico (simulado por ahora - sin fecha_creacion)
             $chartData['labels'] = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-            $chartData['values'] = [25000, 35000, 18500, 30000, 45000, 28000, 40000];
+            $chartData['values'] = [12, 34, 56, 78, 45, 67, 23];
             
         } catch (Exception $e) {
             error_log("Error getting stats: " . $e->getMessage());
@@ -347,14 +354,18 @@ if ($isLoggedIn) {
         <div class="main-content">
             <header class="dashboard-header">
                 <div class="header-grid">
-                    <h1>Dashboard</h1>
+                    <h1>Dashboard
+<?php if (!empty($_SESSION['is_demo'])): ?>
+    <span style="color: #fff; font-weight: 600; font-size: 1rem; margin-left: 1.5rem;">Modo Demo - Las acciones se encuentran deshabilitadas</span>
+<?php endif; ?>
+</h1>
                     <div class="user-info">
                         <div class="user-avatar">
                             <?php echo strtoupper(substr($_SESSION['admin_user'], 0, 1)); ?>
                         </div>
                         <div>
                             <div class="user-name"><?php echo htmlspecialchars($_SESSION['admin_user']); ?></div>
-                            <a href="?logout=1" class="logout-link">Cerrar sesión</a>
+                            <a href="index.php?logout=1" class="btn btn-secondary" style="margin-top: 6px; font-size: 1rem; padding: 8px 18px;">Cerrar sesión</a>
                         </div>
                     </div>
                 </div>
@@ -373,7 +384,7 @@ if ($isLoggedIn) {
                     </div>
 
                     <div class="stat-card">
-                        <div class="stat-title">Ingresos Totales</div>
+                        <div class="stat-title">Presupuestado al día de hoy</div>
                         <div class="stat-value">AR$ <?php echo number_format($stats['ingresos']['total'], 2); ?></div>
                         <div class="stat-change <?php echo $stats['ingresos']['cambio'] >= 0 ? 'positive' : 'negative'; ?>">
                             <?php echo $stats['ingresos']['cambio'] >= 0 ? '↑' : '↓'; ?>
@@ -389,8 +400,9 @@ if ($isLoggedIn) {
 
                 <!-- Gráfico -->
                 <div class="chart-container">
-                    <h2>Ingresos por Día</h2>
+                    <h2 class="chart-title" style="font-size: var(--text-lg); font-weight: 600; margin-bottom: var(--spacing-md);">Presupuestos x Día</h2>
                     <canvas id="ingresosChart"></canvas>
+                    <!-- Aquí NO debe haber valores de dinero ni columna de números sueltos -->
                 </div>
 
                 <!-- Últimos Presupuestos -->
@@ -431,7 +443,7 @@ if ($isLoggedIn) {
             data: {
                 labels: chartData.labels,
                 datasets: [{
-                    label: 'Ingresos',
+                    label: 'Presupuestos',
                     data: chartData.values,
                     borderColor: '#4CAF50',
                     backgroundColor: 'rgba(76, 175, 80, 0.1)',
@@ -441,7 +453,7 @@ if ($isLoggedIn) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false, // Clave para que el gráfico se ajuste al contenedor
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         display: false
@@ -452,7 +464,7 @@ if ($isLoggedIn) {
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return 'AR$ ' + value.toLocaleString();
+                                return value; // Solo número, sin ARS
                             }
                         }
                     }

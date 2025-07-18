@@ -669,38 +669,47 @@ if (isset($_GET['error'])) {
 
         .tabs-header {
             display: flex;
-            border-bottom: 1px solid var(--border-color);
+            gap: 1rem;
+            margin-top: 2.5rem;
+            margin-bottom: 2.5rem;
+            margin-left: 2.5rem;
+            margin-right: 2.5rem;
         }
 
         .tab-button {
-            flex: 1;
-            padding: var(--spacing-md);
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1.5rem;
+            font-size: 1rem;
             font-weight: 500;
+            color: #f3f4f6;
+            background: #343a40;
+            border: 1.5px solid #23272b;
+            border-radius: 10px;
+            box-shadow: 0 1px 4px rgba(26,38,54,0.06);
             cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
+            transition: background 0.18s, color 0.18s, border 0.18s;
+            outline: none;
         }
 
         .tab-button:hover {
-            color: var(--text-primary);
-            background: var(--bg-hover);
+            background: #23272b;
+            color: #fff;
+            border-color: #111;
         }
 
         .tab-button.active {
-            color: var(--accent-primary);
+            background: #23272b;
+            color: #fff;
+            border-color: #111;
+            box-shadow: 0 2px 8px rgba(26,38,54,0.10);
         }
 
-        .tab-button.active::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: var(--accent-primary);
+        .tab-button span[class^="icon"] {
+            display: flex;
+            align-items: center;
+            font-size: 1.2em;
         }
 
         .tab-content {
@@ -905,6 +914,17 @@ if (isset($_GET['error'])) {
             margin-bottom: var(--spacing-md);
             opacity: 0.3;
         }
+
+        .btn-disabled, .btn:disabled {
+            opacity: 0.5 !important;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+        }
+        input:disabled, select:disabled, textarea:disabled {
+            background: #eee !important;
+            color: #888 !important;
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 <body>
@@ -954,21 +974,13 @@ if (isset($_GET['error'])) {
             <!-- Header -->
             <header class="dashboard-header" style="background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: var(--spacing-lg) var(--spacing-xl);">
                 <div class="header-grid" style="display: flex; align-items: center; justify-content: space-between;">
-                    <div>
+                    <div style="display: flex; align-items: center; gap: 1.5rem;">
                         <h2 class="header-title" style="font-size: var(--text-lg); font-weight: 600;">Gestionar Datos</h2>
-                        <p class="header-subtitle" style="font-size: var(--text-sm); color: var(--text-secondary);">Administra categorías y opciones del sistema</p>
+                        <?php if (!empty($_SESSION['is_demo'])): ?>
+                            <span style="color: #fff; font-weight: 600; font-size: 1rem; margin-left: 1.5rem;">Modo Demo - Las acciones se encuentran deshabilitadas</span>
+                        <?php endif; ?>
                     </div>
-                    
-                    <div class="header-actions" style="display: flex; gap: var(--spacing-md);">
-                        <button class="btn btn-secondary" onclick="exportarDatos()">
-                            <span id="export-icon"></span>
-                            Exportar
-                        </button>
-                        <button class="btn btn-primary" onclick="mostrarModalAgregar()">
-                            <span id="add-icon"></span>
-                            Agregar Opción
-                        </button>
-                    </div>
+                    <p class="header-subtitle" style="font-size: var(--text-sm); color: var(--text-secondary);">Administra categorías y opciones del sistema</p>
                 </div>
             </header>
 
@@ -1134,7 +1146,7 @@ if (isset($_GET['error'])) {
                                             <form method="POST" style="display: inline;">
                                                 <input type="hidden" name="action" value="move_opcion_up">
                                                 <input type="hidden" name="id" value="<?php echo $opcion['id']; ?>">
-                                                <button type="submit" class="btn btn-xs btn-secondary" title="Subir">
+                                                <button type="submit" class="btn btn-xs btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" title="Subir" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                                     <span>↑</span>
                                                 </button>
                                             </form>
@@ -1148,20 +1160,20 @@ if (isset($_GET['error'])) {
                                             <form method="POST" style="display: inline;">
                                                 <input type="hidden" name="action" value="move_opcion_down">
                                                 <input type="hidden" name="id" value="<?php echo $opcion['id']; ?>">
-                                                <button type="submit" class="btn btn-xs btn-secondary" title="Bajar">
+                                                <button type="submit" class="btn btn-xs btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" title="Bajar" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                                     <span>↓</span>
                                                 </button>
                                             </form>
                                         </div>
                                     </div>
                                     <div class="table-cell actions-cell">
-                                        <button class="btn btn-sm btn-secondary" onclick="duplicarOpcion(<?php echo $opcion['id']; ?>)" title="Duplicar">
+                                        <button class="btn btn-sm btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" onclick="duplicarOpcion(<?php echo $opcion['id']; ?>)" title="Duplicar" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                             <span id="duplicate-icon-<?php echo $opcion['id']; ?>"></span>
                                         </button>
-                                        <button class="btn btn-sm btn-secondary" onclick="editarOpcion(<?php echo $opcion['id']; ?>)" title="Editar">
+                                        <button class="btn btn-sm btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" onclick="editarOpcion(<?php echo $opcion['id']; ?>)" title="Editar" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                             <span id="edit-icon-<?php echo $opcion['id']; ?>"></span>
                                         </button>
-                                        <button class="btn btn-sm btn-danger" onclick="eliminarOpcion(<?php echo $opcion['id']; ?>, '<?php echo addslashes($opcion['nombre']); ?>')" title="Eliminar">
+                                        <button class="btn btn-sm btn-danger<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" onclick="eliminarOpcion(<?php echo $opcion['id']; ?>, '<?php echo addslashes($opcion['nombre']); ?>')" title="Eliminar" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                             <span id="delete-icon-<?php echo $opcion['id']; ?>"></span>
                                         </button>
                                     </div>
@@ -1233,7 +1245,7 @@ if (isset($_GET['error'])) {
                                             <form method="POST" style="display: inline;">
                                                 <input type="hidden" name="action" value="move_categoria_up">
                                                 <input type="hidden" name="id" value="<?php echo $cat['id']; ?>">
-                                                <button type="submit" class="btn btn-xs btn-secondary" title="Subir">
+                                                <button type="submit" class="btn btn-xs btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" title="Subir" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                                     <span>↑</span>
                                                 </button>
                                             </form>
@@ -1247,7 +1259,7 @@ if (isset($_GET['error'])) {
                                             <form method="POST" style="display: inline;">
                                                 <input type="hidden" name="action" value="move_categoria_down">
                                                 <input type="hidden" name="id" value="<?php echo $cat['id']; ?>">
-                                                <button type="submit" class="btn btn-xs btn-secondary" title="Bajar">
+                                                <button type="submit" class="btn btn-xs btn-secondary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" title="Bajar" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                                                     <span>↓</span>
                                                 </button>
                                             </form>
@@ -1296,30 +1308,30 @@ if (isset($_GET['error'])) {
                 <div class="grid grid-cols-3" style="gap: var(--spacing-md);">
                     <div class="form-group">
                         <label class="form-label">160-180 Días</label>
-                        <input type="text" name="precio_160_dias" class="form-control" onchange="formatearPrecio(this)">
+                        <input type="text" name="precio_160_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">90 Días</label>
-                        <input type="text" name="precio_90_dias" class="form-control" onchange="formatearPrecio(this)">
+                        <input type="text" name="precio_90_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">270 Días</label>
-                        <input type="text" name="precio_270_dias" class="form-control" onchange="formatearPrecio(this)">
+                        <input type="text" name="precio_270_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Descuento (%)</label>
-                    <input type="number" name="descuento" class="form-control" min="0" max="100" value="0">
+                    <input type="number" name="descuento" class="form-control" min="0" max="100" value="0" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                 </div>
                 
                 <div style="display: flex; gap: var(--spacing-md); justify-content: flex-end; margin-top: var(--spacing-lg);">
                     <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalAgregar')">
                         Cancelar
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                         <span id="save-icon"></span>
                         Guardar Opción
                     </button>
@@ -1350,7 +1362,7 @@ if (isset($_GET['error'])) {
                     <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalCategoria')">
                         Cancelar
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary<?php if (!empty($_SESSION['is_demo'])) echo ' btn-disabled'; ?>" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
                         <span id="save-cat-icon"></span>
                         Crear Categoría
                     </button>
@@ -1440,56 +1452,49 @@ if (isset($_GET['error'])) {
     <script src="../assets/js/modern-icons.js"></script>
     <script>
         // Cargar iconos
+        function safeSetIcon(id, icon, size) {
+            var el = document.getElementById(id);
+            if (el) el.innerHTML = modernUI.getIcon(icon, size);
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             // Sidebar
-            document.getElementById('logo-icon').innerHTML = modernUI.getIcon('chart');
-            document.getElementById('nav-dashboard-icon').innerHTML = modernUI.getIcon('dashboard');
-            document.getElementById('nav-data-icon').innerHTML = modernUI.getIcon('settings');
-            document.getElementById('nav-quotes-icon').innerHTML = modernUI.getIcon('document');
-            document.getElementById('nav-prices-icon').innerHTML = modernUI.getIcon('dollar');
-            document.getElementById('nav-calculator-icon').innerHTML = modernUI.getIcon('cart');
-            document.getElementById('nav-logout-icon').innerHTML = modernUI.getIcon('logout');
-            
+            safeSetIcon('logo-icon', 'chart');
+            safeSetIcon('nav-dashboard-icon', 'dashboard');
+            safeSetIcon('nav-data-icon', 'settings');
+            safeSetIcon('nav-quotes-icon', 'document');
+            safeSetIcon('nav-prices-icon', 'dollar');
+            safeSetIcon('nav-calculator-icon', 'cart');
+            safeSetIcon('nav-logout-icon', 'logout');
             // Header
-            document.getElementById('export-icon').innerHTML = modernUI.getIcon('download');
-            document.getElementById('add-icon').innerHTML = modernUI.getIcon('add');
-            
+            safeSetIcon('add-icon', 'add');
             // Alerts
-            const successIcon = document.getElementById('success-icon');
-            if (successIcon) successIcon.innerHTML = modernUI.getIcon('check');
-            const errorIcon = document.getElementById('error-icon');
-            if (errorIcon) errorIcon.innerHTML = modernUI.getIcon('error');
-            const errorIcon2 = document.getElementById('error-icon-2');
-            if (errorIcon2) errorIcon2.innerHTML = modernUI.getIcon('error');
-            
+            safeSetIcon('success-icon', 'check');
+            safeSetIcon('error-icon', 'error');
+            safeSetIcon('error-icon-2', 'error');
             // Tabs
-            document.getElementById('tab-options-icon').innerHTML = modernUI.getIcon('package');
-            document.getElementById('tab-categories-icon').innerHTML = modernUI.getIcon('settings');
-            
+            safeSetIcon('tab-options-icon', 'package');
+            safeSetIcon('tab-categories-icon', 'settings');
             // Search
-            document.getElementById('search-icon').innerHTML = modernUI.getIcon('search');
-            
+            safeSetIcon('search-icon', 'search');
             // Table actions
-            <?php foreach ($opciones as $opcion): ?>
-            document.getElementById('duplicate-icon-<?php echo $opcion['id']; ?>').innerHTML = modernUI.getIcon('duplicate', 'icon-sm');
-            document.getElementById('edit-icon-<?php echo $opcion['id']; ?>').innerHTML = modernUI.getIcon('edit', 'icon-sm');
-            document.getElementById('delete-icon-<?php echo $opcion['id']; ?>').innerHTML = modernUI.getIcon('delete', 'icon-sm');
-            <?php endforeach; ?>
-            
+            document.querySelectorAll('[id^="duplicate-icon-"]').forEach(function(el) {
+                el.innerHTML = modernUI.getIcon('duplicate', 'icon-sm');
+            });
+            document.querySelectorAll('[id^="edit-icon-"]').forEach(function(el) {
+                el.innerHTML = modernUI.getIcon('edit', 'icon-sm');
+            });
+            document.querySelectorAll('[id^="delete-icon-"]').forEach(function(el) {
+                el.innerHTML = modernUI.getIcon('delete', 'icon-sm');
+            });
             // Modal
-            document.getElementById('close-modal-icon').innerHTML = modernUI.getIcon('close');
-            document.getElementById('save-icon').innerHTML = modernUI.getIcon('save');
-            document.getElementById('add-cat-icon').innerHTML = modernUI.getIcon('add');
-            document.getElementById('close-cat-icon').innerHTML = modernUI.getIcon('close');
-            document.getElementById('save-cat-icon').innerHTML = modernUI.getIcon('save');
-            document.getElementById('close-edit-modal-icon').innerHTML = modernUI.getIcon('close');
-            document.getElementById('update-icon').innerHTML = modernUI.getIcon('update');
-            
-            // Aplicar filtro de categoría inicial
-            const selectCategoria = document.getElementById('selectCategoria');
-            if (selectCategoria.value) {
-                filtrarPorCategoria(selectCategoria.value);
-            }
+            safeSetIcon('close-modal-icon', 'close');
+            safeSetIcon('save-icon', 'save');
+            safeSetIcon('add-cat-icon', 'add');
+            safeSetIcon('close-cat-icon', 'close');
+            safeSetIcon('save-cat-icon', 'save');
+            safeSetIcon('close-edit-modal-icon', 'close');
+            safeSetIcon('update-icon', 'update');
         });
 
         // Funciones
