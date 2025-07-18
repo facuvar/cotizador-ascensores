@@ -50,11 +50,11 @@ Sistema completo de cotización y presupuestos para ascensores, montacargas y sa
 ### 1. Clonar el Repositorio
 ```bash
 git clone https://github.com/tu-usuario/company-presupuestos-online-2.git
-cd company-presupuestos-online-2
+cd cotizador-ascensores
 ```
 
 ### 2. Configuración de Base de Datos
-1. Crear una base de datos MySQL llamada `company_presupuestos`
+1. Crear una base de datos MySQL llamada `cotizador_ascensores`
 2. Importar la estructura desde los archivos SQL incluidos
 3. Configurar las credenciales en `sistema/config.php`
 
@@ -66,7 +66,7 @@ El sistema detecta automáticamente si está en entorno local o producción:
 $db_host = 'localhost';
 $db_user = 'root';
 $db_pass = '';
-$db_name = 'company_presupuestos';
+$db_name = 'cotizador_ascensores';
 ```
 
 ### 4. Configuración para Producción (Railway)

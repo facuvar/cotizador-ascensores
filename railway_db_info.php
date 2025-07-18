@@ -37,7 +37,7 @@ $isRailway = isset($_ENV['RAILWAY_ENVIRONMENT']) || isset($_ENV['PORT']);
             <div class="warning">
                 <h3>⚠️ Ejecutar en Railway</h3>
                 <p>Este script debe ejecutarse <strong>desde Railway</strong> para obtener las credenciales públicas.</p>
-                <p>Accede a: <code>https://cotizadorcompany-nuevo-production.up.railway.app/railway_db_info.php</code></p>
+                <p>Accede a: <code>https://cotizador-elevadores.up.railway.app/railway_db_info.php</code></p>
             </div>
             
         <?php else: ?>

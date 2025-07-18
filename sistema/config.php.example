@@ -6,7 +6,7 @@ define('DB_PASS', 'tu_contraseña_mysql');
 define('DB_NAME', 'presupuestos_ascensores');
 
 // Configuración general
-define('SITE_URL', 'http://localhost/cotizadorcompany/sistema');
+define('SITE_URL', 'http://localhost/cotizador-ascensores/sistema');
 define('UPLOAD_DIR', __DIR__ . '/uploads');
 define('XLS_DIR', __DIR__ . '/uploads/xls');
 
