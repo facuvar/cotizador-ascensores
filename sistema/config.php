@@ -14,15 +14,15 @@ if ($isRailway) {
     define('DB_PASS', 'bnTRdfPtPcxXnGEawcKoPxfzQSkIClhs');
     define('DB_NAME', 'railway');
     define('DB_PORT', 3306);
-    define('SITE_URL', 'https://cotizador-ascensores-production.up.railway.app/sistema');
+    define('SITE_URL', 'https://cotizador-elevadores.up.railway.app/');
 } else {
     // 🏠 Configuración Local (XAMPP)
     define('DB_HOST', 'localhost');
     define('DB_USER', 'root');
     define('DB_PASS', '');
-    define('DB_NAME', 'company_presupuestos');
+    define('DB_NAME', 'cotizador_ascensores');
     define('DB_PORT', 3306);
-    define('SITE_URL', 'http://localhost/company-presupuestos-online-2/sistema');
+    define('SITE_URL', 'http://localhost/cotizador_ascensores/sistema');
 }
 
 // Configuración de directorios (adaptable)
