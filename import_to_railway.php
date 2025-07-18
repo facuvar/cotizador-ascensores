@@ -7,8 +7,12 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Cargar configuración de base de datos
-require_once __DIR__ . '/config.php';
+// Buscar el archivo de configuración correcto
+if (file_exists(__DIR__ . '/sistema/config.php')) {
+    require_once __DIR__ . '/sistema/config.php';
+} else {
+    require_once __DIR__ . '/config.php';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['sql_file'])) {
     $fileTmpPath = $_FILES['sql_file']['tmp_name'];
