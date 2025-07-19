@@ -28,11 +28,37 @@ if ($_POST && isset($_POST['action'])) {
         $opcion_excluida_id = $_POST['opcion_excluida_id'];
         $mensaje_error = $_POST['mensaje_error'];
         
-        $stmt = $pdo->prepare("INSERT INTO opciones_excluyentes (opcion_id, opcion_excluida_id, mensaje_error) VALUES (?, ?, ?)");
-        $stmt->execute([$opcion_id, $opcion_excluida_id, $mensaje_error]);
+        // Verificar si la regla ya existe
+        $stmt_check = $pdo->prepare("SELECT id FROM opciones_excluyentes WHERE opcion_id = ? AND opcion_excluida_id = ?");
+        $stmt_check->execute([$opcion_id, $opcion_excluida_id]);
         
-        header('Location: gestionar_reglas_exclusion.php?success=1');
-        exit;
+        if ($stmt_check->fetch()) {
+            // La regla ya existe
+            header('Location: gestionar_reglas_exclusion.php?error=duplicate');
+            exit;
+        }
+        
+        // Verificar que no se esté excluyendo a sí misma
+        if ($opcion_id == $opcion_excluida_id) {
+            header('Location: gestionar_reglas_exclusion.php?error=self_exclusion');
+            exit;
+        }
+        
+        try {
+            $stmt = $pdo->prepare("INSERT INTO opciones_excluyentes (opcion_id, opcion_excluida_id, mensaje_error) VALUES (?, ?, ?)");
+            $stmt->execute([$opcion_id, $opcion_excluida_id, $mensaje_error]);
+            
+            header('Location: gestionar_reglas_exclusion.php?success=1');
+            exit;
+        } catch (PDOException $e) {
+            // Si es un error de duplicado, mostrar mensaje específico
+            if ($e->getCode() == 23000) {
+                header('Location: gestionar_reglas_exclusion.php?error=duplicate');
+            } else {
+                header('Location: gestionar_reglas_exclusion.php?error=database');
+            }
+            exit;
+        }
     } elseif ($_POST['action'] === 'eliminar') {
         $regla_id = $_POST['regla_id'];
         $stmt = $pdo->prepare("DELETE FROM opciones_excluyentes WHERE id = ?");
@@ -442,6 +468,18 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 <?php if (isset($_GET['updated'])): ?>
                     <div class="alert alert-success">✅ Estado de regla actualizado</div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['error']) && $_GET['error'] === 'duplicate'): ?>
+                    <div class="alert alert-danger">❌ Error: Esta regla de exclusión ya existe</div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['error']) && $_GET['error'] === 'self_exclusion'): ?>
+                    <div class="alert alert-danger">❌ Error: Una opción no puede excluirse a sí misma</div>
+                <?php endif; ?>
+                
+                <?php if (isset($_GET['error']) && $_GET['error'] === 'database'): ?>
+                    <div class="alert alert-danger">❌ Error de base de datos. Inténtalo de nuevo.</div>
                 <?php endif; ?>
                 
                 <!-- Formulario para crear nueva regla -->
