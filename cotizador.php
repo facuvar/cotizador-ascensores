@@ -1420,6 +1420,28 @@
                 // NUEVA FUNCIONALIDAD: Filtrar adicionales cuando se selecciona un ascensor
                 if (categoriaId == 1) {
                     filtrarAdicionales();
+                    
+                    // NUEVA FUNCIONALIDAD: Abrir automáticamente la siguiente categoría (ADICIONALES)
+                    // Solo si se seleccionó una opción (no si se deseleccionó)
+                    if (isChecked) {
+                        setTimeout(() => {
+                            const siguienteCategoria = document.getElementById('category-2'); // ID de ADICIONALES
+                            if (siguienteCategoria && !siguienteCategoria.classList.contains('active')) {
+                                siguienteCategoria.classList.add('active');
+                                
+                                // Mostrar indicador visual de que se abrió automáticamente
+                                if (typeof modernUI !== 'undefined' && modernUI.showToast) {
+                                    modernUI.showToast('¡Ahora puedes seleccionar adicionales!', 'info');
+                                }
+                                
+                                // Scroll suave hacia la siguiente categoría
+                                siguienteCategoria.scrollIntoView({ 
+                                    behavior: 'smooth', 
+                                    block: 'start' 
+                                });
+                            }
+                        }, 300); // Pequeño delay para que se vea la selección
+                    }
                 }
             } else {
                 // NUEVA LÓGICA: Manejo de grupos mutuamente excluyentes para puertas de ascensores
