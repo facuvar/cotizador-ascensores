@@ -814,6 +814,7 @@
         let opciones = [];
         let selectedOptions = [];
         let currentDelivery = '90';
+        let exclusionRules = {}; // NUEVA: Reglas de exclusión dinámicas
 
         // Cargar iconos
         document.addEventListener('DOMContentLoaded', function() {
@@ -920,6 +921,9 @@
                         console.log(`🔄 API: ${opcionesAscensores.length} ascensores encontrados`);
                     }
                     
+                    // NUEVA FUNCIONALIDAD: Cargar reglas de exclusión
+                    await cargarReglasExclusion();
+                    
                     renderCategorias();
                 } else {
                     throw new Error(data.message || 'Error al cargar categorías');
@@ -933,6 +937,25 @@
                         <button class="btn btn-primary btn-sm" onclick="cargarCategorias()">Reintentar</button>
                     </div>
                 `;
+            }
+        }
+        
+        // NUEVA FUNCIÓN: Cargar reglas de exclusión desde la API
+        async function cargarReglasExclusion() {
+            try {
+                const response = await fetch('api/get_exclusion_rules.php');
+                const data = await response.json();
+                
+                if (data.success) {
+                    exclusionRules = data.reglas;
+                    console.log(`🔄 Reglas de exclusión cargadas: ${data.total_reglas} reglas`);
+                } else {
+                    console.warn('No se pudieron cargar las reglas de exclusión:', data.error);
+                    exclusionRules = {};
+                }
+            } catch (error) {
+                console.warn('Error al cargar reglas de exclusión:', error);
+                exclusionRules = {};
             }
         }
         
@@ -1444,90 +1467,49 @@
                     }
                 }
             } else {
-                // NUEVA LÓGICA: Manejo de grupos mutuamente excluyentes para puertas de ascensores
-                const nombreOpcion = opcion.nombre.toLowerCase();
-                
-                // Definir grupos mutuamente excluyentes
-                const gruposExcluyentes = [
-                    // Grupo 1: Puertas de Ascensores Electromecanicos
-                    [
-                        'ascensores electromecanicos adicional puertas de 900',
-                        'ascensores electromecanicos adicional puertas de 1000', 
-                        'ascensores electromecanicos adicional puertas de 1300',
-                        'ascensores electromecanicos adicional puertas de 1800'
-                    ],
-                    // Grupo 2: Puertas de Ascensores Hidraulicos
-                    [
-                        'ascensores hidraulicos adicional puertas de 900',
-                        'ascensores hidraulicos adicional puertas de 1000',
-                        'ascensores hidraulicos adicional puertas de 1200', 
-                        'ascensores hidraulicos adicional puertas de 1800'
-                    ],
-                    // Grupo 3: Indicadores de Ascensores Electromecanicos
-                    [
-                        'ascensores electromecanicos adicional indicador led alfa num 1, 2',
-                        'ascensores electromecanicos adicional indicador led alfa num 0, 8',
-                        'ascensores electromecanicos adicional indicador lcd color 5'
-                    ],
-                    // Grupo 4: Capacidad de Carga de Ascensores Electromecanicos
-                    [
-                        'ascensores electromecanicos adicional 750kg maquina - cabina 2,25m3',
-                        'ascensores electromecanicos adicional 1000kg maquina cabina 2,66'
-                    ],
-                    // Grupo 5: Capacidad de Carga Ascensores Hidraulicos
-                    [
-                        'ascensores hidraulicos adicional 750kg central y piston, cabina 2,25m3',
-                        'ascensores hidraulicos adicional 1000kg central y piston, cabina de 2.66m3'
-                    ]
-                ];
-                
-                // Verificar si la opción actual pertenece a algún grupo excluyente
-                let grupoExcluyente = null;
-                for (let grupo of gruposExcluyentes) {
-                    if (grupo.some(nombreItem => nombreOpcion.includes(nombreItem))) {
-                        grupoExcluyente = grupo;
-                        break;
-                    }
-                }
-                
-                if (grupoExcluyente && isChecked) {
-                    console.log('Opción con exclusión mutua detectada, aplicando para grupo:', grupoExcluyente);
+                // NUEVA LÓGICA DINÁMICA: Usar reglas de exclusión desde la base de datos
+                if (isChecked) {
+                    // Verificar si hay reglas de exclusión para esta opción
+                    const reglasParaEstaOpcion = exclusionRules[optionId] || [];
                     
-                    // Deseleccionar todas las otras opciones del mismo grupo excluyente
-                    selectedOptions.filter(id => {
-                        const otherOption = opciones.find(op => op.id == id);
-                        if (!otherOption) return false;
+                    if (reglasParaEstaOpcion.length > 0) {
+                        console.log(`Aplicando ${reglasParaEstaOpcion.length} reglas de exclusión para opción ${optionId}`);
                         
-                        const otherNombre = otherOption.nombre.toLowerCase();
-                        return grupoExcluyente.some(nombreItem => 
-                            otherNombre.includes(nombreItem) && id != optionId
-                        );
-                    }).forEach(id => {
-                        removeSelectedOption(id);
-                        // Actualizar visualmente el checkbox
-                        const otherCheckbox = document.querySelector(`[data-option-id="${id}"].option-checkbox`);
-                        if (otherCheckbox) {
-                            const otherInput = otherCheckbox.querySelector('input');
-                            if (otherInput) {
-                                otherInput.checked = false;
-                                otherCheckbox.classList.remove('checked');
+                        // Deseleccionar todas las opciones excluidas
+                        reglasParaEstaOpcion.forEach(regla => {
+                            const opcionExcluidaId = regla.opcion_excluida_id;
+                            
+                            // Verificar si la opción excluida está seleccionada
+                            if (selectedOptions.includes(opcionExcluidaId)) {
+                                removeSelectedOption(opcionExcluidaId);
+                                
+                                // Actualizar visualmente el checkbox
+                                const otherCheckbox = document.querySelector(`[data-option-id="${opcionExcluidaId}"].option-checkbox`);
+                                if (otherCheckbox) {
+                                    const otherInput = otherCheckbox.querySelector('input');
+                                    if (otherInput) {
+                                        otherInput.checked = false;
+                                        otherCheckbox.classList.remove('checked');
+                                    }
+                                }
+                                
+                                console.log(`Deseleccionada opción excluida: ${regla.opcion_excluida_nombre}`);
+                                
+                                // Mostrar mensaje de error
+                                if (typeof modernUI !== 'undefined' && modernUI.showToast) {
+                                    modernUI.showToast(regla.mensaje_error, 'warning');
+                                }
                             }
-                        }
-                        console.log('Deseleccionada opción del grupo excluyente:', otherOption.nombre);
-                    });
+                        });
+                    }
                     
                     // Seleccionar la nueva opción
                     addSelectedOption(optionId);
                     checkboxElement.classList.add('checked');
                 } else {
-                    // Lógica normal para ADICIONALES (múltiple selección)
-                    checkboxElement.classList.toggle('checked', isChecked);
-                    
-                    if (isChecked) {
-                        addSelectedOption(optionId);
-                    } else {
-                        removeSelectedOption(optionId);
-                    }
+                    // Deseleccionar la opción actual
+                    removeSelectedOption(optionId);
+                    checkboxElement.classList.remove('checked');
                 }
             }
             
