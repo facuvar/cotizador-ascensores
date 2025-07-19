@@ -1,5 +1,12 @@
 <?php
-require_once '../includes/db.php';
+// Configuración de la base de datos
+define('DB_HOST', 'localhost');
+define('DB_PORT', '3306');
+define('DB_NAME', 'cotizador_ascensores');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+require_once __DIR__ . '/../includes/db.php';
 
 // Procesar formulario de nueva regla
 if ($_POST && isset($_POST['action'])) {
