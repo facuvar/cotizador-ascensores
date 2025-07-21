@@ -12,28 +12,43 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
-// Configuración de la base de datos
-if (getenv('DB_HOST')) {
-    define('DB_HOST', getenv('DB_HOST'));
-    define('DB_PORT', getenv('DB_PORT') ?: '3306');
-    define('DB_NAME', getenv('DB_NAME'));
-    define('DB_USER', getenv('DB_USER'));
-    define('DB_PASS', getenv('DB_PASS'));
-} else {
-    define('DB_HOST', 'localhost');
-    define('DB_PORT', '3306');
-    define('DB_NAME', 'cotizador_ascensores');
-    define('DB_USER', 'root');
-    define('DB_PASS', '');
+// Cargar configuración - buscar en múltiples ubicaciones
+$configPaths = [
+    __DIR__ . '/../config.php',           // Railway (raíz del proyecto)
+    __DIR__ . '/../sistema/config.php',   // Local (dentro de sistema)
+];
+
+$configLoaded = false;
+foreach ($configPaths as $configPath) {
+    if (file_exists($configPath)) {
+        require_once $configPath;
+        $configLoaded = true;
+        break;
+    }
 }
 
-// Debug temporal para Railway
-error_log('DB_HOST=' . DB_HOST);
-error_log('DB_PORT=' . DB_PORT);
-error_log('DB_NAME=' . DB_NAME);
-error_log('DB_USER=' . DB_USER);
+if (!$configLoaded) {
+    die("Error: No se pudo encontrar el archivo de configuración en ninguna ubicación");
+}
 
-require_once __DIR__ . '/../includes/db.php';
+// Cargar DB - buscar en múltiples ubicaciones
+$dbPaths = [
+    __DIR__ . '/../sistema/includes/db.php',   // Local
+    __DIR__ . '/../includes/db.php',           // Railway alternativo
+];
+
+$dbLoaded = false;
+foreach ($dbPaths as $dbPath) {
+    if (file_exists($dbPath)) {
+        require_once $dbPath;
+        $dbLoaded = true;
+        break;
+    }
+}
+
+if (!$dbLoaded) {
+    die("Error: No se pudo encontrar el archivo de base de datos en ninguna ubicación");
+}
 
 // Procesar formulario de nuevas reglas (dual list)
 if ($_POST && isset($_POST['action']) && $_POST['action'] === 'crear_dual') {
