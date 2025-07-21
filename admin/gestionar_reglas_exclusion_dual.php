@@ -13,11 +13,19 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 }
 
 // Configuración de la base de datos
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3306');
-define('DB_NAME', 'cotizador_ascensores');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+if (getenv('DB_HOST')) {
+    define('DB_HOST', getenv('DB_HOST'));
+    define('DB_PORT', getenv('DB_PORT') ?: '3306');
+    define('DB_NAME', getenv('DB_NAME'));
+    define('DB_USER', getenv('DB_USER'));
+    define('DB_PASS', getenv('DB_PASS'));
+} else {
+    define('DB_HOST', 'localhost');
+    define('DB_PORT', '3306');
+    define('DB_NAME', 'cotizador_ascensores');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+}
 
 require_once __DIR__ . '/../includes/db.php';
 
