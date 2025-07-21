@@ -604,6 +604,9 @@ if ($isLoggedIn) {
 
             <button class="form-button" type="submit">Iniciar Sesión</button>
         </form>
+        <div style="margin: 1.5rem 0; padding: 1rem; background: #f3f3f3; color: #222; border-radius: 0.5rem; font-size: 1.1rem; font-style: italic; text-align: center; max-width: 350px; margin-left: auto; margin-right: auto;">
+        Usuario: <b>demo</b> &nbsp; Contraseña: <b>demo123</b>
+    </div>
     </div>
 </body>
 </html>
