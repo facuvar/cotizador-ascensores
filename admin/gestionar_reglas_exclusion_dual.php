@@ -70,6 +70,26 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'crear_dual') {
     exit;
 }
 
+// 1. Procesar edición desde el modal
+if ($_POST && isset($_POST['action']) && $_POST['action'] === 'editar_dual') {
+    $opcion_id = $_POST['opcion_id'];
+    $opciones_excluidas = isset($_POST['opciones_excluidas']) ? $_POST['opciones_excluidas'] : [];
+    $mensaje_error = $_POST['mensaje_error'];
+
+    // Eliminar reglas existentes para esta opción
+    $stmt_del = $pdo->prepare("DELETE FROM opciones_excluyentes WHERE opcion_id = ?");
+    $stmt_del->execute([$opcion_id]);
+
+    // Insertar nuevas reglas
+    $stmt_ins = $pdo->prepare("INSERT INTO opciones_excluyentes (opcion_id, opcion_excluida_id, mensaje_error) VALUES (?, ?, ?)");
+    foreach ($opciones_excluidas as $opcion_excluida_id) {
+        if ($opcion_id == $opcion_excluida_id) continue;
+        $stmt_ins->execute([$opcion_id, $opcion_excluida_id, $mensaje_error]);
+    }
+    header('Location: gestionar_reglas_exclusion_dual.php?success=1');
+    exit;
+}
+
 // Obtener todas las opciones para los dropdowns
 $stmt = $pdo->prepare("SELECT o.id, o.nombre, c.nombre as categoria FROM opciones o INNER JOIN categorias c ON o.categoria_id = c.id ORDER BY c.nombre, o.nombre");
 $stmt->execute();
@@ -265,32 +285,86 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php if (empty($reglas)): ?>
                         <p style="color: var(--text-secondary);">No hay reglas de exclusión configuradas.</p>
                     <?php else: ?>
-                        <?php foreach ($reglas as $regla): ?>
-                            <div class="rule-item <?= $regla['activo'] ? '' : 'inactive' ?>">
+                        <?php
+                        // Agrupar reglas por opcion_id para edición masiva
+                        $reglas_por_opcion = [];
+                        foreach ($reglas as $regla) {
+                            $reglas_por_opcion[$regla['opcion_id']][] = $regla;
+                        }
+                        foreach ($reglas_por_opcion as $opcion_id => $grupo):
+                            $primera = $grupo[0];
+                        ?>
+                            <div class="rule-item <?= $primera['activo'] ? '' : 'inactive' ?>">
                                 <div class="rule-info">
-                                    <div><strong>Si selecciono:</strong> [<?= $regla['categoria_nombre'] ?>] <?= htmlspecialchars($regla['opcion_nombre']) ?></div>
-                                    <div><strong>Entonces NO puedo seleccionar:</strong> [<?= $regla['categoria_excluida_nombre'] ?>] <?= htmlspecialchars($regla['opcion_excluida_nombre']) ?></div>
-                                    <div><strong>Mensaje:</strong> <?= htmlspecialchars($regla['mensaje_error']) ?></div>
-                                    <div><strong>Estado:</strong> <?= $regla['activo'] ? '✅ Activa' : '❌ Inactiva' ?></div>
+                                    <div><strong>Si selecciono:</strong> [<?= $primera['categoria_nombre'] ?>] <?= htmlspecialchars($primera['opcion_nombre']) ?></div>
+                                    <div><strong>Entonces NO puedo seleccionar:</strong>
+                                        <ul style="margin: 0 0 0 1.5em; color: var(--text-primary);">
+                                            <?php foreach ($grupo as $regla): ?>
+                                                <li>[<?= $regla['categoria_excluida_nombre'] ?>] <?= htmlspecialchars($regla['opcion_excluida_nombre']) ?></li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                    <div><strong>Mensaje:</strong> <?= htmlspecialchars($primera['mensaje_error']) ?></div>
+                                    <div><strong>Estado:</strong> <?= $primera['activo'] ? '✅ Activa' : '❌ Inactiva' ?></div>
                                 </div>
                                 <div class="rule-actions">
                                     <form method="POST" style="display: inline;">
                                         <input type="hidden" name="action" value="toggle">
-                                        <input type="hidden" name="regla_id" value="<?= $regla['id'] ?>">
-                                        <input type="hidden" name="activo" value="<?= $regla['activo'] ?>">
-                                        <button type="submit" class="btn btn-<?= $regla['activo'] ? 'warning' : 'success' ?>">
-                                            <?= $regla['activo'] ? 'Desactivar' : 'Activar' ?>
+                                        <input type="hidden" name="regla_id" value="<?= $primera['id'] ?>">
+                                        <input type="hidden" name="activo" value="<?= $primera['activo'] ?>">
+                                        <button type="submit" class="btn btn-<?= $primera['activo'] ? 'warning' : 'success' ?>">
+                                            <?= $primera['activo'] ? 'Desactivar' : 'Activar' ?>
                                         </button>
                                     </form>
                                     <form method="POST" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta regla?')">
                                         <input type="hidden" name="action" value="eliminar">
-                                        <input type="hidden" name="regla_id" value="<?= $regla['id'] ?>">
+                                        <input type="hidden" name="regla_id" value="<?= $primera['id'] ?>">
                                         <button type="submit" class="btn btn-danger">Eliminar</button>
                                     </form>
+                                    <button type="button" class="btn btn-secondary btn-editar" data-opcion-id="<?= $opcion_id ?>">Editar</button>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
+                </div>
+
+                <!-- Modal de edición -->
+                <div id="modal-editar" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+                    <div style="background:var(--bg-card); padding:2.5rem; border-radius:var(--radius-lg); min-width:700px; max-width:90vw; margin:auto; position:relative;">
+                        <button id="cerrar-modal-editar" style="position:absolute; top:1rem; right:1rem; background:none; border:none; color:var(--text-secondary); font-size:2rem; cursor:pointer;">&times;</button>
+                        <h2>Editar Exclusiones</h2>
+                        <form method="POST" id="form-editar-dual">
+                            <input type="hidden" name="action" value="editar_dual">
+                            <input type="hidden" name="opcion_id" id="editar_opcion_id">
+                            <div class="form-group">
+                                <label><strong>Si selecciono:</strong></label>
+                                <input type="text" id="editar_opcion_nombre" disabled style="width:100%; background:var(--bg-tertiary); color:var(--text-primary); border:1px solid var(--border-color); padding:var(--spacing-md); border-radius:var(--radius-md);">
+                            </div>
+                            <div class="form-group">
+                                <label><strong>Entonces NO puedo seleccionar:</strong></label>
+                                <div class="dual-list-container">
+                                    <div class="dual-list-box">
+                                        <select id="editar_opciones_disponibles" multiple size="12"></select>
+                                    </div>
+                                    <div class="dual-list-actions">
+                                        <button type="button" id="editar_add_exclusion">&gt;&gt;</button>
+                                        <button type="button" id="editar_remove_exclusion">&lt;&lt;</button>
+                                    </div>
+                                    <div class="dual-list-box">
+                                        <select id="editar_opciones_excluidas" name="opciones_excluidas[]" multiple size="12"></select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label><strong>Mensaje de error:</strong></label>
+                                <input type="text" name="mensaje_error" id="editar_mensaje_error" placeholder="Esta opción no es compatible con la selección anterior">
+                            </div>
+                            <div style="display:flex; gap:1rem; justify-content:flex-end;">
+                                <button type="button" class="btn btn-secondary" id="cancelar-edicion">Cancelar</button>
+                                <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -357,6 +431,67 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
         // Al enviar el formulario, seleccionar todas las opciones excluidas
         document.getElementById('dual-list-form').addEventListener('submit', function() {
             Array.from(excluidas.options).forEach(opt => opt.selected = true);
+        });
+
+        // --- EDICIÓN DE REGLAS CON DUAL LIST ---
+        const reglasPorOpcion = {};
+        reglas.forEach(r => {
+            if (!reglasPorOpcion[r.opcion_id]) reglasPorOpcion[r.opcion_id] = [];
+            reglasPorOpcion[r.opcion_id].push(r);
+        });
+
+        const btnsEditar = document.querySelectorAll('.btn-editar');
+        const modalEditar = document.getElementById('modal-editar');
+        const cerrarModalEditar = document.getElementById('cerrar-modal-editar');
+        const cancelarEdicion = document.getElementById('cancelar-edicion');
+        const editarOpcionId = document.getElementById('editar_opcion_id');
+        const editarOpcionNombre = document.getElementById('editar_opcion_nombre');
+        const editarMensajeError = document.getElementById('editar_mensaje_error');
+        const editarDisponibles = document.getElementById('editar_opciones_disponibles');
+        const editarExcluidas = document.getElementById('editar_opciones_excluidas');
+        const editarAddBtn = document.getElementById('editar_add_exclusion');
+        const editarRemoveBtn = document.getElementById('editar_remove_exclusion');
+
+        btnsEditar.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const opcionId = this.getAttribute('data-opcion-id');
+                const grupo = reglasPorOpcion[opcionId];
+                if (!grupo) return;
+                editarOpcionId.value = opcionId;
+                editarOpcionNombre.value = `[${grupo[0].categoria_nombre}] ${grupo[0].opcion_nombre}`;
+                editarMensajeError.value = grupo[0].mensaje_error;
+                // Llenar dual list
+                editarDisponibles.innerHTML = '';
+                editarExcluidas.innerHTML = '';
+                const excluidasIds = grupo.map(r => r.opcion_excluida_id.toString());
+                opciones.forEach(op => {
+                    if (op.id == opcionId) return; // No autoexclusión
+                    const option = document.createElement('option');
+                    option.value = op.id;
+                    option.textContent = `[${op.categoria}] ${op.nombre}`;
+                    if (excluidasIds.includes(op.id.toString())) {
+                        editarExcluidas.appendChild(option);
+                    } else {
+                        editarDisponibles.appendChild(option);
+                    }
+                });
+                modalEditar.style.display = 'flex';
+            });
+        });
+        cerrarModalEditar.addEventListener('click', () => modalEditar.style.display = 'none');
+        cancelarEdicion.addEventListener('click', () => modalEditar.style.display = 'none');
+        editarAddBtn.addEventListener('click', function() {
+            Array.from(editarDisponibles.selectedOptions).forEach(opt => {
+                editarExcluidas.appendChild(opt);
+            });
+        });
+        editarRemoveBtn.addEventListener('click', function() {
+            Array.from(editarExcluidas.selectedOptions).forEach(opt => {
+                editarDisponibles.appendChild(opt);
+            });
+        });
+        document.getElementById('form-editar-dual').addEventListener('submit', function() {
+            Array.from(editarExcluidas.options).forEach(opt => opt.selected = true);
         });
     </script>
 </body>
