@@ -447,10 +447,6 @@ $stats = [
                     <span id="nav-rules-icon"></span>
                     <span>Reglas de Exclusión (Dual)</span>
                 </a>
-                <a href="gestionar_reglas_exclusion.php" class="sidebar-item">
-                    <span id="nav-rules-icon"></span>
-                    <span>Reglas de Exclusión (Clásico)</span>
-                </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
                         <span id="nav-calculator-icon"></span>
