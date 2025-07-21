@@ -27,6 +27,12 @@ if (getenv('DB_HOST')) {
     define('DB_PASS', '');
 }
 
+// Debug temporal para Railway
+error_log('DB_HOST=' . DB_HOST);
+error_log('DB_PORT=' . DB_PORT);
+error_log('DB_NAME=' . DB_NAME);
+error_log('DB_USER=' . DB_USER);
+
 require_once __DIR__ . '/../includes/db.php';
 
 // Procesar formulario de nuevas reglas (dual list)
