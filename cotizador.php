@@ -645,10 +645,10 @@
         <div class="header-content">
             <div class="logo-section">
                 <img src="assets/images/logo-empresa.png" alt="Logo de la Empresa" class="company-logo">
+                <span style="color: #222; font-style: italic; font-size: 1.25rem; margin-left: 2rem;">Cotizador de Ascensores 100% Customizable</span>
             </div>
-            
             <div class="header-actions">
-                <!-- Botones removidos según solicitud -->
+                <a href="/admin/index.php" target="_blank" style="background: #888; color: #fff; padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; font-weight: 600; font-size: 1rem;">Ver Demo Admin</a>
             </div>
         </div>
     </header>
@@ -1222,7 +1222,7 @@
                         const checkbox = element.querySelector('.option-checkbox');
                         if (checkbox) {
                             const optionId = checkbox.getAttribute('data-option-id');
-                            console.log('Opción a procesar:', optionId);
+                            console.log('Procesando opción directa:', optionId);
                             if (optionId) {
                                 toggleOption(parseInt(optionId), checkbox);
                             }
