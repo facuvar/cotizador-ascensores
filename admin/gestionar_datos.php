@@ -951,10 +951,17 @@ if (isset($_GET['error'])) {
                     <span id="nav-quotes-icon"></span>
                     <span>Presupuestos</span>
                 </a>
-
                 <a href="ajustar_precios.php" class="sidebar-item">
                     <span id="nav-prices-icon"></span>
                     <span>Ajustar Precios</span>
+                </a>
+                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
+                    <span id="nav-rules-icon"></span>
+                    <span>Reglas de Exclusión (Dual)</span>
+                </a>
+                <a href="gestionar_reglas_exclusion.php" class="sidebar-item">
+                    <span id="nav-rules-icon"></span>
+                    <span>Reglas de Exclusión (Clásico)</span>
                 </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">

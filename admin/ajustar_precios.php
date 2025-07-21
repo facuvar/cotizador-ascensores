@@ -439,17 +439,24 @@ try {
                     <span id="nav-quotes-icon"></span>
                     <span>Presupuestos</span>
                 </a>
-
                 <a href="ajustar_precios.php" class="sidebar-item active">
                     <span id="nav-prices-icon"></span>
                     <span>Ajustar Precios</span>
+                </a>
+                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
+                    <span id="nav-rules-icon"></span>
+                    <span>Reglas de Exclusión (Dual)</span>
+                </a>
+                <a href="gestionar_reglas_exclusion.php" class="sidebar-item">
+                    <span id="nav-rules-icon"></span>
+                    <span>Reglas de Exclusión (Clásico)</span>
                 </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
                         <span id="nav-calculator-icon"></span>
                         <span>Ir al Cotizador</span>
                     </a>
-                    <a href="?logout=1" class="sidebar-item" style="color: var(--accent-danger);">
+                    <a href="index.php?logout=1" class="sidebar-item" style="color: var(--accent-danger);">
                         <span id="nav-logout-icon"></span>
                         <span>Cerrar Sesión</span>
                     </a>

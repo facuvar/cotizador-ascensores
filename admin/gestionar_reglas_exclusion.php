@@ -144,22 +144,23 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         .sidebar-menu {
             flex: 1;
-            padding: var(--spacing-lg);
+            padding: var(--spacing-md);
             display: flex;
             flex-direction: column;
-            gap: var(--spacing-sm);
+            /* Elimino gap para igualar al index */
         }
 
         .sidebar-item {
             display: flex;
             align-items: center;
-            gap: var(--spacing-md);
-            padding: var(--spacing-md);
+            padding: var(--spacing-sm) var(--spacing-md);
             border-radius: var(--radius-md);
             color: var(--text-secondary);
             text-decoration: none;
             transition: all 0.2s ease;
             font-weight: 500;
+            margin-bottom: var(--spacing-xs);
+            gap: var(--spacing-sm);
         }
 
         .sidebar-item:hover {
@@ -424,9 +425,13 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <span id="nav-prices-icon"></span>
                     <span>Ajustar Precios</span>
                 </a>
-                <a href="gestionar_reglas_exclusion.php" class="sidebar-item active">
+                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item active">
                     <span id="nav-rules-icon"></span>
-                    <span>Reglas de Exclusión</span>
+                    <span>Reglas de Exclusión (Dual)</span>
+                </a>
+                <a href="gestionar_reglas_exclusion.php" class="sidebar-item">
+                    <span id="nav-rules-icon"></span>
+                    <span>Reglas de Exclusión (Clásico)</span>
                 </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
