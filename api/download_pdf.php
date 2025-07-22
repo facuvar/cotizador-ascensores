@@ -70,10 +70,10 @@ try {
     
     $presupuesto = $result->fetch_assoc();
     
-    // Obtener detalles de las opciones seleccionadas
-    $query_detalles = "SELECT o.*, c.nombre as categoria_nombre 
-                      FROM opciones o 
-                      JOIN presupuesto_detalles pd ON o.id = pd.opcion_id 
+    // Obtener detalles de las opciones seleccionadas y SUS PRECIOS GUARDADOS
+    $query_detalles = "SELECT o.nombre, o.descuento, c.nombre as categoria_nombre, pd.precio 
+                      FROM presupuesto_detalles pd
+                      JOIN opciones o ON pd.opcion_id = o.id
                       LEFT JOIN categorias c ON o.categoria_id = c.id 
                       WHERE pd.presupuesto_id = ?";
     
@@ -442,13 +442,22 @@ try {
                         <?php if (!empty($opciones_detalles)): ?>
                             <?php $i = 1; foreach ($opciones_detalles as $opcion): ?>
                                 <?php 
-                                $precio_campo = "precio_{$presupuesto['plazo_entrega']}_dias";
-                                $precio = $opcion[$precio_campo] ?? 0;
+                                // Ya no necesitamos calcular el precio, lo obtenemos directamente.
+                                $precio = $opcion['precio'] ?? 0;
+                                
+                                // Si es un descuento, mostramos el porcentaje en lugar del precio.
+                                if ($opcion['categoria_nombre'] === 'Descuentos') {
+                                    $display_text = htmlspecialchars($opcion['nombre']) . " (" . (float)$opcion['descuento'] . "%)";
+                                    $display_price = "-";
+                                } else {
+                                    $display_text = htmlspecialchars($opcion['nombre']);
+                                    $display_price = "AR$" . number_format($precio, 2, ',', '.');
+                                }
                                 ?>
                                 <tr>
                                     <td><?php echo $i; ?></td>
-                                    <td><?php echo htmlspecialchars($opcion['nombre']); ?></td>
-                                    <td style="text-align: right;">AR$<?php echo number_format($precio, 2, ',', '.'); ?></td>
+                                    <td><?php echo $display_text; ?></td>
+                                    <td style="text-align: right;"><?php echo $display_price; ?></td>
                                 </tr>
                             <?php $i++; endforeach; ?>
                         <?php else: ?>

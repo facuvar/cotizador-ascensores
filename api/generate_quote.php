@@ -210,19 +210,63 @@ try {
         throw new Exception('No se encontraron las opciones seleccionadas');
     }
     
-    // Calcular totales
+    // Calcular totales de forma eficiente
     $subtotal = 0;
     $descuento_porcentaje = 0;
-    
+    $plazo_id = null;
+
+    // Obtener el ID del plazo seleccionado
+    $stmt_plazo = $conn->prepare("SELECT id FROM plazos_entrega WHERE dias = ? LIMIT 1");
+    if (!$stmt_plazo) {
+        throw new Exception('Error al preparar consulta de plazo: ' . $conn->error);
+    }
+    $stmt_plazo->bind_param('i', $plazo);
+    $stmt_plazo->execute();
+    $result_plazo = $stmt_plazo->get_result();
+    if ($row = $result_plazo->fetch_assoc()) {
+        $plazo_id = $row['id'];
+    }
+    if (!$plazo_id) {
+        throw new Exception('El plazo de entrega seleccionado no es válido.');
+    }
+
+    // Obtener todos los precios necesarios con UNA SOLA CONSULTA
+    $precios_map = [];
+    $opciones_con_precio_ids = [];
+    foreach ($opciones_detalle as $opcion) {
+        // Excluir descuentos de la consulta de precios
+        if ($opcion['categoria_id'] != 3) {
+            $opciones_con_precio_ids[] = $opcion['id'];
+        }
+    }
+
+    if (!empty($opciones_con_precio_ids)) {
+        $placeholders = str_repeat('?,', count($opciones_con_precio_ids) - 1) . '?';
+        $query_precios = "SELECT opcion_id, precio FROM opciones_precios WHERE plazo_id = ? AND opcion_id IN ($placeholders)";
+        
+        $stmt_precios = $conn->prepare($query_precios);
+        $types = 'i' . str_repeat('i', count($opciones_con_precio_ids));
+        $params = array_merge([$plazo_id], $opciones_con_precio_ids);
+        $stmt_precios->bind_param($types, ...$params);
+        $stmt_precios->execute();
+        $result_precios = $stmt_precios->get_result();
+        
+        while ($row = $result_precios->fetch_assoc()) {
+            $precios_map[$row['opcion_id']] = (float)$row['precio'];
+        }
+    }
+
+    // Ahora, calcular totales usando los datos en memoria
     foreach ($opciones_detalle as $opcion) {
         if ($opcion['categoria_id'] == 3 && isset($opcion['descuento']) && $opcion['descuento'] > 0) {
-            // Es un descuento
             $descuento_porcentaje = max($descuento_porcentaje, $opcion['descuento']);
         } else {
-            // Es un producto con precio
-            $precio_campo = "precio_{$plazo}_dias";
-            $precio = $opcion[$precio_campo] ?? 0;
-            $subtotal += (float)$precio;
+            $precio = $precios_map[$opcion['id']] ?? 0;
+            if (stripos($opcion['nombre'], 'restar') !== false) {
+                $subtotal -= $precio;
+            } else {
+                $subtotal += $precio;
+            }
         }
     }
     
@@ -318,10 +362,10 @@ try {
     }
     
     foreach ($opciones_detalle as $opcion) {
-        $precio_campo = "precio_{$plazo}_dias";
-        $precio = $opcion[$precio_campo] ?? 0;
+        // Para descuentos, el precio es 0. Para otros, lo buscamos en el mapa.
+        $precio_guardar = $precios_map[$opcion['id']] ?? 0;
         
-        $stmt_detail->bind_param('iid', $presupuesto_id, $opcion['id'], $precio);
+        $stmt_detail->bind_param('iid', $presupuesto_id, $opcion['id'], $precio_guardar);
         $stmt_detail->execute();
     }
     

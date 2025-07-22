@@ -97,7 +97,7 @@ try {
             }
         } else {
             // Método 2: Desde tabla presupuesto_detalles
-            $query = "SELECT o.*, c.nombre as categoria_nombre, pd.precio as precio_detalle
+            $query = "SELECT o.nombre, o.descuento, c.nombre as categoria_nombre, pd.precio 
                      FROM presupuesto_detalles pd
                      JOIN opciones o ON pd.opcion_id = o.id
                      LEFT JOIN categorias c ON o.categoria_id = c.id 
@@ -122,33 +122,11 @@ try {
     exit;
 }
 
-// Calcular totales
-$plazo = $presupuesto['plazo_entrega'] ?? '90';
-$subtotal = 0;
-$descuento_porcentaje = 0;
-
-foreach ($items as $item) {
-    if ($item['categoria_id'] == 3 && $item['descuento'] > 0) {
-        $descuento_porcentaje = max($descuento_porcentaje, $item['descuento']);
-    } else {
-        $precio = 0;
-        switch ($plazo) {
-            case '90':
-                $precio = $item['precio_90_dias'] ?? 0;
-                break;
-            case '160':
-                $precio = $item['precio_160_dias'] ?? 0;
-                break;
-            case '270':
-                $precio = $item['precio_270_dias'] ?? 0;
-                break;
-        }
-        $subtotal += $precio;
-    }
-}
-
-$descuento = $subtotal * ($descuento_porcentaje / 100);
-$total = $subtotal - $descuento;
+// Usar los totales guardados en el presupuesto en lugar de recalcularlos
+$subtotal = $presupuesto['subtotal'] ?? 0;
+$descuento_porcentaje = $presupuesto['descuento_porcentaje'] ?? 0;
+$descuento = $presupuesto['descuento_monto'] ?? 0;
+$total = $presupuesto['total'] ?? 0;
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -602,18 +580,8 @@ $total = $subtotal - $descuento;
                         <?php 
                         $num = 1;
                         foreach ($items as $item): 
-                            $precio = 0;
-                            switch ($plazo) {
-                                case '90':
-                                    $precio = $item['precio_90_dias'] ?? 0;
-                                    break;
-                                case '160':
-                                    $precio = $item['precio_160_dias'] ?? 0;
-                                    break;
-                                case '270':
-                                    $precio = $item['precio_270_dias'] ?? 0;
-                                    break;
-                            }
+                            // El precio ahora viene directamente de la consulta como 'precio'
+                            $precio = $item['precio'] ?? 0;
                         ?>
                         <div class="item-row">
                             <div class="item-number"><?php echo $num++; ?></div>
@@ -625,8 +593,8 @@ $total = $subtotal - $descuento;
                             <div class="item-name"><?php echo htmlspecialchars($item['nombre']); ?></div>
                             <div class="item-price">
                                 <?php 
-                                if ($item['categoria_id'] == 3 && $item['descuento'] > 0) {
-                                    echo $item['descuento'] . '% desc.';
+                                if (isset($item['categoria_nombre']) && $item['categoria_nombre'] === 'Descuentos' && isset($item['descuento']) && $item['descuento'] > 0) {
+                                    echo (float)$item['descuento'] . '% desc.';
                                 } else {
                                     echo '$' . number_format($precio, 2, ',', '.');
                                 }
@@ -634,7 +602,7 @@ $total = $subtotal - $descuento;
                             </div>
                             <div class="item-price">
                                 <?php 
-                                if ($item['categoria_id'] == 3 && $item['descuento'] > 0) {
+                                if (isset($item['categoria_nombre']) && $item['categoria_nombre'] === 'Descuentos') {
                                     echo '-';
                                 } else {
                                     echo '$' . number_format($precio, 2, ',', '.');
