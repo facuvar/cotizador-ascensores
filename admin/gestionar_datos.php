@@ -734,6 +734,16 @@ if (isset($_GET['msg'])) {
 if (isset($_GET['error'])) {
     $error = $_GET['error'];
 }
+
+// Identificar el ID de la categoría de descuentos para usar en JS
+$descuento_categoria_id = null;
+foreach ($categorias as $cat) {
+    // Usamos stripos para una comparación insensible a mayúsculas/minúsculas
+    if (stripos($cat['nombre'], 'descuento') !== false) {
+        $descuento_categoria_id = (int)$cat['id'];
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -1434,7 +1444,7 @@ if (isset($_GET['error'])) {
                 
                 <div class="form-group">
                     <label class="form-label">Categoría</label>
-                    <select name="categoria_id" class="form-control" required>
+                    <select name="categoria_id" class="form-control" required onchange="updateModalFields(this, 'add')">
                         <option value="">Seleccionar categoría</option>
                         <?php foreach ($categorias as $cat): ?>
                         <option value="<?php echo $cat['id']; ?>">
@@ -1449,11 +1459,13 @@ if (isset($_GET['error'])) {
                     <input type="text" name="nombre" class="form-control" required>
                 </div>
                 
-                <div id="add-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
-                    <!-- Los campos de precios dinámicos se insertarán aquí -->
+                <div id="add-precios-wrapper">
+                    <div id="add-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
+                        <!-- Los campos de precios dinámicos se insertarán aquí -->
+                    </div>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="add-descuento-wrapper" style="display: none;">
                     <label class="form-label">Descuento (%)</label>
                     <input type="number" name="descuento" class="form-control" min="0" max="100" value="0">
                 </div>
@@ -1518,7 +1530,7 @@ if (isset($_GET['error'])) {
                 
                 <div class="form-group">
                     <label class="form-label">Categoría</label>
-                    <select name="categoria_id" id="edit_categoria_id" class="form-control" required>
+                    <select name="categoria_id" id="edit_categoria_id" class="form-control" required onchange="updateModalFields(this, 'edit')">
                         <option value="">Seleccionar categoría</option>
                         <?php foreach ($categorias as $cat): ?>
                         <option value="<?php echo $cat['id']; ?>">
@@ -1533,11 +1545,13 @@ if (isset($_GET['error'])) {
                     <input type="text" name="nombre" id="edit_nombre" class="form-control" required>
                 </div>
                 
-                <div id="edit-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
-                    <!-- Los campos de precios dinámicos se insertarán aquí -->
+                <div id="edit-precios-wrapper">
+                    <div id="edit-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
+                        <!-- Los campos de precios dinámicos se insertarán aquí -->
+                    </div>
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group" id="edit-descuento-wrapper" style="display: none;">
                     <label class="form-label">Descuento (%)</label>
                     <input type="number" name="descuento" id="edit_descuento" class="form-control" min="0" max="100" value="0">
                 </div>
@@ -1632,6 +1646,10 @@ if (isset($_GET['error'])) {
         <input type="hidden" name="id" id="deletePlazoId">
     </form>
 
+    <script>
+        // Pasar el ID de la categoría de descuento de PHP a JavaScript
+        const DESCUENTO_CAT_ID = <?php echo json_encode($descuento_categoria_id); ?>;
+    </script>
     <script src="../assets/js/modern-icons.js"></script>
     <script>
         // Cargar iconos
@@ -1717,6 +1735,10 @@ if (isset($_GET['error'])) {
                                 </div>
                             `;
                         });
+                        // Asegurarse de que el campo de descuento esté en el estado correcto al abrir
+                        const categoriaSelect = document.querySelector('#modalAgregar select[name="categoria_id"]');
+                        updateModalFields(categoriaSelect, 'add');
+                        
                         document.getElementById('modalAgregar').classList.add('active');
                     } else {
                         alert('Error al cargar plazos para el modal.');
@@ -1826,7 +1848,14 @@ if (isset($_GET['error'])) {
                                 document.getElementById('edit_id').value = opcion.id;
                                 document.getElementById('edit_categoria_id').value = opcion.categoria_id;
                                 document.getElementById('edit_nombre').value = opcion.nombre;
-                                document.getElementById('edit_descuento').value = opcion.descuento || 0;
+                                
+                                // Ocultar o mostrar los campos correctos según la categoría cargada
+                                updateModalFields(document.getElementById('edit_categoria_id'), 'edit');
+                                
+                                // Solo llenar el valor de descuento si el campo es visible
+                                if (document.getElementById('edit-descuento-wrapper').style.display === 'block') {
+                                    document.getElementById('edit_descuento').value = opcion.descuento || 0;
+                                }
 
                                 // Construir campos de precios dinámicos
                                 const container = document.getElementById('edit-precios-container');
@@ -1859,6 +1888,35 @@ if (isset($_GET['error'])) {
                      console.error('Error:', error);
                      modernUI.showToast('Error al cargar los plazos', 'error');
                 });
+        }
+
+        function updateModalFields(selectElement, modalPrefix) {
+            const preciosWrapper = document.getElementById(`${modalPrefix}-precios-wrapper`);
+            const descuentoWrapper = document.getElementById(`${modalPrefix}-descuento-wrapper`);
+            const descuentoInput = descuentoWrapper.querySelector('input[name="descuento"]');
+            
+            const selectedCategoryId = parseInt(selectElement.value, 10);
+
+            if (selectedCategoryId === DESCUENTO_CAT_ID) {
+                // Es categoría Descuento: mostrar descuento, ocultar precios
+                if(preciosWrapper) preciosWrapper.style.display = 'none';
+                if(descuentoWrapper) descuentoWrapper.style.display = 'block';
+
+                // Limpiar precios si se ocultan para no enviar datos basura
+                const preciosContainer = document.getElementById(`${modalPrefix}-precios-container`);
+                if (preciosContainer) {
+                    preciosContainer.querySelectorAll('input[type="text"]').forEach(input => input.value = '0');
+                }
+            } else {
+                // Es otra categoría: ocultar descuento, mostrar precios
+                if(preciosWrapper) preciosWrapper.style.display = 'block';
+                if(descuentoWrapper) descuentoWrapper.style.display = 'none';
+                
+                // Limpiar descuento si se oculta
+                if (descuentoInput) {
+                    descuentoInput.value = 0; 
+                }
+            }
         }
 
         function exportarDatos() {
@@ -2053,6 +2111,23 @@ if (isset($_GET['error'])) {
             if (confirm(`¿Estás seguro de eliminar el plazo "${nombre}"?`)) {
                 document.getElementById('deletePlazoId').value = id;
                 document.getElementById('deletePlazoForm').submit();
+            }
+        }
+
+        function toggleDescuentoField(selectElement, wrapperId) {
+            const wrapper = document.getElementById(wrapperId);
+            const input = wrapper.querySelector('input[name="descuento"]');
+            
+            // Comparamos como números para evitar errores de tipo
+            const selectedCategoryId = parseInt(selectElement.value, 10);
+
+            if (selectedCategoryId === DESCUENTO_CAT_ID) {
+                wrapper.style.display = 'block';
+            } else {
+                wrapper.style.display = 'none';
+                if (input) {
+                    input.value = 0; // Limpiar el valor si se oculta
+                }
             }
         }
     </script>
