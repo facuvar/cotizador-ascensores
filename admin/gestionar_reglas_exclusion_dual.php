@@ -91,9 +91,15 @@ if ($_POST && isset($_POST['action']) && $_POST['action'] === 'editar_dual') {
 }
 
 // Obtener todas las opciones para los dropdowns
-$stmt = $pdo->prepare("SELECT o.id, o.nombre, c.nombre as categoria FROM opciones o INNER JOIN categorias c ON o.categoria_id = c.id ORDER BY c.nombre, o.nombre");
+$stmt = $pdo->prepare("SELECT o.id, o.nombre, c.id as categoria_id, c.nombre as categoria FROM opciones o INNER JOIN categorias c ON o.categoria_id = c.id ORDER BY c.nombre, o.nombre");
 $stmt->execute();
 $opciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Obtener todas las categorías para el filtro
+$stmt_categorias = $pdo->prepare("SELECT id, nombre FROM categorias ORDER BY nombre");
+$stmt_categorias->execute();
+$categorias = $stmt_categorias->fetchAll(PDO::FETCH_ASSOC);
+
 
 // Obtener todas las reglas existentes
 $stmt = $pdo->prepare("
@@ -244,6 +250,17 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <h2>Configurar Exclusiones con Dual List</h2>
                     <form method="POST" id="dual-list-form">
                         <input type="hidden" name="action" value="crear_dual">
+
+                        <div class="form-group">
+                             <label for="categoria_filtro"><strong>Paso 1: Selecciona una Categoría para filtrar los productos</strong></label>
+                            <select id="categoria_filtro" class="form-control">
+                                <option value="">-- Todas las Categorías --</option>
+                                <?php foreach ($categorias as $categoria): ?>
+                                    <option value="<?= $categoria['id'] ?>"><?= htmlspecialchars($categoria['nombre']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
                         <div class="form-group">
                             <label><strong>Si selecciono:</strong></label>
                             <select name="opcion_id" id="opcion_id" required>
@@ -383,15 +400,34 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
         });
 
         // Opciones PHP a JS
-        const opciones = <?php echo json_encode($opciones); ?>;
+        const opciones_totales = <?php echo json_encode($opciones); ?>;
+        let opciones_filtradas = [...opciones_totales];
         const reglas = <?php echo json_encode($reglas); ?>;
 
-        // Dual list logic
+        const categoriaFiltro = document.getElementById('categoria_filtro');
         const opcionSelect = document.getElementById('opcion_id');
         const disponibles = document.getElementById('opciones-disponibles');
         const excluidas = document.getElementById('opciones-excluidas');
         const addBtn = document.getElementById('add-exclusion');
         const removeBtn = document.getElementById('remove-exclusion');
+        
+        function actualizarOpcionesPrincipales() {
+            const categoriaId = categoriaFiltro.value;
+            opcionSelect.innerHTML = '<option value="">Selecciona una opción...</option>';
+            
+            opciones_filtradas = categoriaId ? opciones_totales.filter(op => op.categoria_id == categoriaId) : opciones_totales;
+
+            opciones_filtradas.forEach(op => {
+                const option = document.createElement('option');
+                option.value = op.id;
+                option.textContent = `[${op.categoria}] ${op.nombre}`;
+                opcionSelect.appendChild(option);
+            });
+
+            renderDualList();
+        }
+
+        categoriaFiltro.addEventListener('change', actualizarOpcionesPrincipales);
 
         function renderDualList() {
             // Limpiar
@@ -401,8 +437,8 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (!selectedOpcion) return;
             // Buscar exclusiones actuales
             const excluidasIds = reglas.filter(r => r.opcion_id == selectedOpcion).map(r => r.opcion_excluida_id.toString());
-            // Llenar disponibles y excluidas
-            opciones.forEach(op => {
+            // Llenar disponibles y excluidas con TODAS las opciones
+            opciones_totales.forEach(op => {
                 if (op.id == selectedOpcion) return; // No autoexclusión
                 const option = document.createElement('option');
                 option.value = op.id;
@@ -464,7 +500,7 @@ $reglas = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 editarDisponibles.innerHTML = '';
                 editarExcluidas.innerHTML = '';
                 const excluidasIds = grupo.map(r => r.opcion_excluida_id.toString());
-                opciones.forEach(op => {
+                opciones_totales.forEach(op => {
                     if (op.id == opcionId) return; // No autoexclusión
                     const option = document.createElement('option');
                     option.value = op.id;
