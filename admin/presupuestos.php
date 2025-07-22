@@ -445,7 +445,7 @@ $stats = [
                 </a>
                 <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
                     <span id="nav-rules-icon"></span>
-                    <span>Reglas de Exclusión (Dual)</span>
+                    <span>Reglas de Exclusión</span>
                 </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
@@ -690,6 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
     safeSetIcon('nav-data-icon', 'settings');
     safeSetIcon('nav-quotes-icon', 'document');
     safeSetIcon('nav-prices-icon', 'dollar');
+    safeSetIcon('nav-rules-icon', 'check-shield');
     safeSetIcon('nav-calculator-icon', 'cart');
     safeSetIcon('nav-logout-icon', 'logout');
     // Header

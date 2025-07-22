@@ -67,10 +67,12 @@ try {
         $categorias[] = $row;
     }
     
-    // Obtener opciones con categorías ordenadas por campo orden
-    $query = "SELECT o.*, c.nombre as categoria_nombre 
+    // Obtener opciones con categorías y contador de precios
+    $query = "SELECT o.*, c.nombre as categoria_nombre, COUNT(op.id) as price_count
               FROM opciones o 
               LEFT JOIN categorias c ON o.categoria_id = c.id 
+              LEFT JOIN opciones_precios op ON o.id = op.opcion_id
+              GROUP BY o.id
               ORDER BY c.orden ASC, o.orden ASC, o.nombre ASC";
     
     $result = $conn->query($query);
@@ -80,6 +82,15 @@ try {
     
     while ($row = $result->fetch_assoc()) {
         $opciones[] = $row;
+    }
+
+    // Obtener plazos de entrega
+    $plazos = [];
+    $result_plazos = $conn->query("SELECT * FROM plazos_entrega ORDER BY orden ASC, dias ASC");
+    if ($result_plazos) {
+        while ($row = $result_plazos->fetch_assoc()) {
+            $plazos[] = $row;
+        }
     }
 
     // Función para extraer el número de paradas de un nombre
@@ -158,21 +169,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'add_opcion':
                 $categoria_id = $_POST['categoria_id'] ?? 0;
                 $nombre = $_POST['nombre'] ?? '';
-                $precio_90 = $_POST['precio_90_dias'] ?? 0;
-                $precio_160 = $_POST['precio_160_dias'] ?? 0;
-                $precio_270 = $_POST['precio_270_dias'] ?? 0;
                 $descuento = $_POST['descuento'] ?? 0;
-                
+                $precios = $_POST['precios'] ?? [];
+
                 if ($nombre && $categoria_id) {
-                    // Obtener el siguiente orden para esta categoría
-                    $result = $conn->query("SELECT MAX(orden) as max_orden FROM opciones WHERE categoria_id = $categoria_id");
-                    $max_orden = $result->fetch_assoc()['max_orden'] ?? 0;
-                    $nuevo_orden = $max_orden + 1;
-                    
-                    $stmt = $conn->prepare("INSERT INTO opciones (categoria_id, nombre, precio_90_dias, precio_160_dias, precio_270_dias, descuento, orden) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("isddddi", $categoria_id, $nombre, $precio_90, $precio_160, $precio_270, $descuento, $nuevo_orden);
-                    if ($stmt->execute()) {
+                    $conn->begin_transaction();
+                    try {
+                        // Obtener el siguiente orden
+                        $result = $conn->query("SELECT MAX(orden) as max_orden FROM opciones WHERE categoria_id = $categoria_id");
+                        $max_orden = $result->fetch_assoc()['max_orden'] ?? 0;
+                        $nuevo_orden = $max_orden + 1;
+
+                        // Insertar la opción
+                        $stmt = $conn->prepare("INSERT INTO opciones (categoria_id, nombre, descuento, orden) VALUES (?, ?, ?, ?)");
+                        $stmt->bind_param("isdi", $categoria_id, $nombre, $descuento, $nuevo_orden);
+                        $stmt->execute();
+                        $opcion_id = $stmt->insert_id;
+
+                        // Insertar los precios
+                        $stmt_precio = $conn->prepare("INSERT INTO opciones_precios (opcion_id, plazo_id, precio) VALUES (?, ?, ?)");
+                        foreach ($precios as $plazo_id => $precio) {
+                            if (!empty($precio)) {
+                                // Parsea correctamente el formato es-AR: quita puntos de miles, luego reemplaza coma decimal
+                                $precio_decimal = (float)str_replace(',', '.', str_replace('.', '', $precio));
+                                $stmt_precio->bind_param("iid", $opcion_id, $plazo_id, $precio_decimal);
+                                $stmt_precio->execute();
+                            }
+                        }
+
+                        $conn->commit();
                         $mensaje = "Opción agregada exitosamente";
+                    } catch (Exception $e) {
+                        $conn->rollback();
+                        throw $e;
                     }
                 }
                 break;
@@ -195,14 +224,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         // Crear una copia con nombre modificado
                         $nombre_copia = $opcion['nombre'] . ' (copia)';
-                        $stmt = $conn->prepare("INSERT INTO opciones (categoria_id, nombre, precio_90_dias, precio_160_dias, precio_270_dias, descuento, orden) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                        $stmt = $conn->prepare("INSERT INTO opciones (categoria_id, nombre, descuento, orden) VALUES (?, ?, ?, ?)");
                         $stmt->bind_param(
-                            "isddddi", 
+                            "isdi", 
                             $opcion['categoria_id'], 
                             $nombre_copia, 
-                            $opcion['precio_90_dias'], 
-                            $opcion['precio_160_dias'], 
-                            $opcion['precio_270_dias'], 
                             $opcion['descuento'],
                             $nuevo_orden
                         );
@@ -218,16 +244,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $id = $_POST['id'] ?? 0;
                 $categoria_id = $_POST['categoria_id'] ?? 0;
                 $nombre = $_POST['nombre'] ?? '';
-                $precio_90 = $_POST['precio_90_dias'] ?? 0;
-                $precio_160 = $_POST['precio_160_dias'] ?? 0;
-                $precio_270 = $_POST['precio_270_dias'] ?? 0;
                 $descuento = $_POST['descuento'] ?? 0;
+                $precios = $_POST['precios'] ?? [];
                 
                 if ($id && $nombre && $categoria_id) {
-                    $stmt = $conn->prepare("UPDATE opciones SET categoria_id=?, nombre=?, precio_90_dias=?, precio_160_dias=?, precio_270_dias=?, descuento=? WHERE id=?");
-                    $stmt->bind_param("isddddi", $categoria_id, $nombre, $precio_90, $precio_160, $precio_270, $descuento, $id);
-                    if ($stmt->execute()) {
+                    $conn->begin_transaction();
+                    try {
+                        // Actualizar datos de la opción
+                        $stmt = $conn->prepare("UPDATE opciones SET categoria_id=?, nombre=?, descuento=? WHERE id=?");
+                        $stmt->bind_param("isdi", $categoria_id, $nombre, $descuento, $id);
+                        $stmt->execute();
+
+                        // Borrar precios antiguos y insertar los nuevos
+                        $stmt_delete = $conn->prepare("DELETE FROM opciones_precios WHERE opcion_id = ?");
+                        $stmt_delete->bind_param("i", $id);
+                        $stmt_delete->execute();
+                        
+                        $stmt_precio = $conn->prepare("INSERT INTO opciones_precios (opcion_id, plazo_id, precio) VALUES (?, ?, ?)");
+                        foreach ($precios as $plazo_id => $precio) {
+                            if (!empty($precio)) {
+                                // Parsea correctamente el formato es-AR: quita puntos de miles, luego reemplaza coma decimal
+                                $precio_decimal = (float)str_replace(',', '.', str_replace('.', '', $precio));
+                                $stmt_precio->bind_param("iid", $id, $plazo_id, $precio_decimal);
+                                $stmt_precio->execute();
+                            }
+                        }
+
+                        $conn->commit();
                         $mensaje = "Opción actualizada exitosamente";
+                    } catch (Exception $e) {
+                        $conn->rollback();
+                        throw $e;
                     }
                 }
                 break;
@@ -577,6 +624,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $mensaje = "Error: Datos no válidos";
                 }
                 break;
+
+            case 'add_plazo':
+                $nombre = $_POST['nombre'] ?? '';
+                $dias = $_POST['dias'] ?? 0;
+                $orden = $_POST['orden'] ?? 0;
+                if ($nombre && $dias) {
+                    $stmt = $conn->prepare("INSERT INTO plazos_entrega (nombre, dias, orden) VALUES (?, ?, ?)");
+                    $stmt->bind_param("sii", $nombre, $dias, $orden);
+                    if ($stmt->execute()) {
+                        $mensaje = "Plazo de entrega agregado exitosamente";
+                    }
+                }
+                break;
+
+            case 'edit_plazo':
+                $id = $_POST['id'] ?? 0;
+                $nombre = $_POST['nombre'] ?? '';
+                $dias = $_POST['dias'] ?? 0;
+                $orden = $_POST['orden'] ?? 0;
+                if ($id && $nombre && $dias) {
+                    $stmt = $conn->prepare("UPDATE plazos_entrega SET nombre = ?, dias = ?, orden = ? WHERE id = ?");
+                    $stmt->bind_param("siii", $nombre, $dias, $orden, $id);
+                    if ($stmt->execute()) {
+                        $mensaje = "Plazo de entrega actualizado exitosamente";
+                    }
+                }
+                break;
+
+            case 'delete_plazo':
+                $id = $_POST['id'] ?? 0;
+                if ($id) {
+                    $stmt = $conn->prepare("DELETE FROM plazos_entrega WHERE id = ?");
+                    $stmt->bind_param("i", $id);
+                    if ($stmt->execute()) {
+                        $mensaje = "Plazo de entrega eliminado exitosamente";
+                    }
+                }
+                break;
+            
+            case 'toggle_plazo_active':
+                $id = $_POST['id'] ?? 0;
+                if ($id) {
+                    $stmt_check = $conn->prepare("SELECT activo FROM plazos_entrega WHERE id = ?");
+                    $stmt_check->bind_param("i", $id);
+                    $stmt_check->execute();
+                    $result = $stmt_check->get_result();
+                    $current_activo = $result->fetch_assoc()['activo'];
+                    $new_activo = $current_activo ? 0 : 1;
+
+                    $stmt = $conn->prepare("UPDATE plazos_entrega SET activo = ? WHERE id = ?");
+                    $stmt->bind_param("ii", $new_activo, $id);
+                    if ($stmt->execute()) {
+                        $mensaje = "Estado del plazo actualizado.";
+                    }
+                }
+                break;
         }
         
         // Recargar página para mostrar cambios - SOLO si no hay error con botones
@@ -759,7 +862,7 @@ if (isset($_GET['error'])) {
 
         .table-row {
             display: grid;
-            grid-template-columns: 2fr 80px 3fr 1fr 1fr 1fr 1fr 100px 120px;
+            grid-template-columns: 3fr 80px 4fr 1fr 100px 120px; /* Ajustado para no tener precios */
             padding: var(--spacing-md);
             border-bottom: 1px solid var(--border-color);
             align-items: center;
@@ -947,18 +1050,9 @@ if (isset($_GET['error'])) {
                     <span id="nav-data-icon"></span>
                     <span>Gestionar Datos</span>
                 </a>
-                <a href="presupuestos.php" class="sidebar-item">
-                    <span id="nav-quotes-icon"></span>
-                    <span>Presupuestos</span>
-                </a>
-                <a href="ajustar_precios.php" class="sidebar-item">
-                    <span id="nav-prices-icon"></span>
-                    <span>Ajustar Precios</span>
-                </a>
-                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
-                    <span id="nav-rules-icon"></span>
-                    <span>Reglas de Exclusión (Dual)</span>
-                </a>
+                <a href="presupuestos.php" class="sidebar-item"><span>Presupuestos</span></a>
+                <a href="ajustar_precios.php" class="sidebar-item"><span>Ajustar Precios</span></a>
+                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item"><span>Reglas de Exclusión</span></a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
                         <span id="nav-calculator-icon"></span>
@@ -1033,7 +1127,7 @@ if (isset($_GET['error'])) {
                         <div class="mini-stat-value">
                             <?php 
                             $activas = array_filter($opciones, function($o) {
-                                return $o['precio_90_dias'] > 0 || $o['precio_160_dias'] > 0 || $o['precio_270_dias'] > 0;
+                                return isset($o['price_count']) && $o['price_count'] > 0;
                             });
                             echo count($activas);
                             ?>
@@ -1052,6 +1146,10 @@ if (isset($_GET['error'])) {
                         <button class="tab-button" onclick="cambiarTab('categorias')">
                             <span id="tab-categories-icon"></span>
                             Categorías
+                        </button>
+                        <button class="tab-button" onclick="cambiarTab('plazos')">
+                            <span id="tab-plazos-icon"></span>
+                            Plazos de Entrega
                         </button>
                     </div>
 
@@ -1080,9 +1178,6 @@ if (isset($_GET['error'])) {
                                 <div class="table-cell">Categoría</div>
                                 <div class="table-cell">Posición</div>
                                 <div class="table-cell">Nombre</div>
-                                <div class="table-cell">160-180 Días</div>
-                                <div class="table-cell">90 Días</div>
-                                <div class="table-cell">270 Días</div>
                                 <div class="table-cell">Descuento</div>
                                 <div class="table-cell">Orden</div>
                                 <div class="table-cell">Acciones</div>
@@ -1127,15 +1222,6 @@ if (isset($_GET['error'])) {
                                     </div>
                                     <div class="table-cell">
                                         <strong><?php echo htmlspecialchars($opcion['nombre']); ?></strong>
-                                    </div>
-                                    <div class="table-cell price-cell">
-                                        <?php echo $opcion['precio_160_dias'] > 0 ? '$' . number_format($opcion['precio_160_dias'], 2, ',', '.') : '-'; ?>
-                                    </div>
-                                    <div class="table-cell price-cell">
-                                        <?php echo $opcion['precio_90_dias'] > 0 ? '$' . number_format($opcion['precio_90_dias'], 2, ',', '.') : '-'; ?>
-                                    </div>
-                                    <div class="table-cell price-cell">
-                                        <?php echo $opcion['precio_270_dias'] > 0 ? '$' . number_format($opcion['precio_270_dias'], 2, ',', '.') : '-'; ?>
                                     </div>
                                     <div class="table-cell">
                                         <?php if ($opcion['descuento'] > 0): ?>
@@ -1273,6 +1359,61 @@ if (isset($_GET['error'])) {
                             <?php endif; ?>
                         </div>
                     </div>
+
+                    <!-- Tab Plazos de Entrega -->
+                    <div id="tab-plazos" class="tab-content">
+                        <div class="toolbar">
+                            <h3>Gestión de Plazos de Entrega</h3>
+                            <button class="btn btn-primary" onclick="mostrarModalPlazo()">
+                                <span id="add-plazo-icon"></span>
+                                Nuevo Plazo
+                            </button>
+                        </div>
+
+                        <div class="data-table">
+                            <div class="table-row table-header" style="grid-template-columns: 3fr 1fr 1fr 1fr 2fr;">
+                                <div class="table-cell">Nombre</div>
+                                <div class="table-cell">Días</div>
+                                <div class="table-cell">Orden</div>
+                                <div class="table-cell">Estado</div>
+                                <div class="table-cell">Acciones</div>
+                            </div>
+
+                            <?php if (empty($plazos)): ?>
+                            <div class="empty-state">
+                                <p>No hay plazos de entrega registrados.</p>
+                            </div>
+                            <?php else: ?>
+                                <?php foreach ($plazos as $plazo): ?>
+                                <div class="table-row" style="grid-template-columns: 3fr 1fr 1fr 1fr 2fr;">
+                                    <div class="table-cell"><strong><?php echo htmlspecialchars($plazo['nombre']); ?></strong></div>
+                                    <div class="table-cell"><?php echo htmlspecialchars($plazo['dias']); ?></div>
+                                    <div class="table-cell"><?php echo htmlspecialchars($plazo['orden']); ?></div>
+                                    <div class="table-cell">
+                                        <span class="badge <?php echo $plazo['activo'] ? 'badge-success' : 'badge-danger'; ?>">
+                                            <?php echo $plazo['activo'] ? 'Activo' : 'Inactivo'; ?>
+                                        </span>
+                                    </div>
+                                    <div class="table-cell actions-cell">
+                                        <button class="btn btn-sm btn-secondary" onclick="editarPlazo(<?php echo htmlspecialchars(json_encode($plazo), ENT_QUOTES, 'UTF-8'); ?>)">
+                                            <span id="edit-plazo-icon-<?php echo $plazo['id']; ?>"></span>
+                                        </button>
+                                        <form method="POST" style="display: inline;">
+                                            <input type="hidden" name="action" value="toggle_plazo_active">
+                                            <input type="hidden" name="id" value="<?php echo $plazo['id']; ?>">
+                                            <button type="submit" class="btn btn-sm <?php echo $plazo['activo'] ? 'btn-warning' : 'btn-success'; ?>" title="<?php echo $plazo['activo'] ? 'Desactivar' : 'Activar'; ?>">
+                                                <span id="toggle-plazo-icon-<?php echo $plazo['id']; ?>"></span>
+                                            </button>
+                                        </form>
+                                        <button class="btn btn-sm btn-danger" onclick="eliminarPlazo(<?php echo $plazo['id']; ?>, '<?php echo addslashes($plazo['nombre']); ?>')">
+                                            <span id="delete-plazo-icon-<?php echo $plazo['id']; ?>"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
@@ -1308,26 +1449,13 @@ if (isset($_GET['error'])) {
                     <input type="text" name="nombre" class="form-control" required>
                 </div>
                 
-                <div class="grid grid-cols-3" style="gap: var(--spacing-md);">
-                    <div class="form-group">
-                        <label class="form-label">160-180 Días</label>
-                        <input type="text" name="precio_160_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">90 Días</label>
-                        <input type="text" name="precio_90_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">270 Días</label>
-                        <input type="text" name="precio_270_dias" class="form-control" onchange="formatearPrecio(this)" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
-                    </div>
+                <div id="add-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
+                    <!-- Los campos de precios dinámicos se insertarán aquí -->
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Descuento (%)</label>
-                    <input type="number" name="descuento" class="form-control" min="0" max="100" value="0" <?php if (!empty($_SESSION['is_demo'])) echo 'disabled'; ?>>
+                    <input type="number" name="descuento" class="form-control" min="0" max="100" value="0">
                 </div>
                 
                 <div style="display: flex; gap: var(--spacing-md); justify-content: flex-end; margin-top: var(--spacing-lg);">
@@ -1405,21 +1533,8 @@ if (isset($_GET['error'])) {
                     <input type="text" name="nombre" id="edit_nombre" class="form-control" required>
                 </div>
                 
-                <div class="grid grid-cols-3" style="gap: var(--spacing-md);">
-                    <div class="form-group">
-                        <label class="form-label">160-180 Días</label>
-                        <input type="text" name="precio_160_dias" id="edit_precio_160_dias" class="form-control" onchange="formatearPrecio(this)">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">90 Días</label>
-                        <input type="text" name="precio_90_dias" id="edit_precio_90_dias" class="form-control" onchange="formatearPrecio(this)">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">270 Días</label>
-                        <input type="text" name="precio_270_dias" id="edit_precio_270_dias" class="form-control" onchange="formatearPrecio(this)">
-                    </div>
+                <div id="edit-precios-container" class="grid grid-cols-2" style="gap: var(--spacing-md);">
+                    <!-- Los campos de precios dinámicos se insertarán aquí -->
                 </div>
                 
                 <div class="form-group">
@@ -1440,6 +1555,65 @@ if (isset($_GET['error'])) {
         </div>
     </div>
 
+    <!-- Modal Agregar Plazo -->
+    <div id="modalPlazo" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Agregar Nuevo Plazo</h3>
+                <button class="btn btn-icon" onclick="cerrarModal('modalPlazo')"><span id="close-plazo-icon"></span></button>
+            </div>
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="add_plazo">
+                <div class="form-group">
+                    <label class="form-label">Nombre del Plazo</label>
+                    <input type="text" name="nombre" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Días</label>
+                    <input type="number" name="dias" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Orden</label>
+                    <input type="number" name="orden" class="form-control" value="0">
+                </div>
+                <div style="display: flex; gap: var(--spacing-md); justify-content: flex-end; margin-top: var(--spacing-lg);">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalPlazo')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><span id="save-plazo-icon"></span> Guardar Plazo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Plazo -->
+    <div id="modalEditarPlazo" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Editar Plazo</h3>
+                <button class="btn btn-icon" onclick="cerrarModal('modalEditarPlazo')"><span id="close-edit-plazo-icon"></span></button>
+            </div>
+            <form method="POST" action="">
+                <input type="hidden" name="action" value="edit_plazo">
+                <input type="hidden" name="id" id="edit_plazo_id">
+                <div class="form-group">
+                    <label class="form-label">Nombre del Plazo</label>
+                    <input type="text" name="nombre" id="edit_plazo_nombre" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Días</label>
+                    <input type="number" name="dias" id="edit_plazo_dias" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Orden</label>
+                    <input type="number" name="orden" id="edit_plazo_orden" class="form-control">
+                </div>
+                <div style="display: flex; gap: var(--spacing-md); justify-content: flex-end; margin-top: var(--spacing-lg);">
+                    <button type="button" class="btn btn-secondary" onclick="cerrarModal('modalEditarPlazo')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><span id="update-plazo-icon"></span> Actualizar Plazo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Form oculto para eliminar -->
     <form id="deleteForm" method="POST" action="" style="display: none;">
         <input type="hidden" name="action" value="delete_opcion">
@@ -1450,6 +1624,12 @@ if (isset($_GET['error'])) {
     <form id="duplicateForm" method="POST" action="" style="display: none;">
         <input type="hidden" name="action" value="duplicate_opcion">
         <input type="hidden" name="id" id="duplicateId">
+    </form>
+
+    <!-- Form oculto para eliminar plazo -->
+    <form id="deletePlazoForm" method="POST" action="" style="display: none;">
+        <input type="hidden" name="action" value="delete_plazo">
+        <input type="hidden" name="id" id="deletePlazoId">
     </form>
 
     <script src="../assets/js/modern-icons.js"></script>
@@ -1478,6 +1658,7 @@ if (isset($_GET['error'])) {
             // Tabs
             safeSetIcon('tab-options-icon', 'package');
             safeSetIcon('tab-categories-icon', 'settings');
+            safeSetIcon('tab-plazos-icon', 'clock');
             // Search
             safeSetIcon('search-icon', 'search');
             // Table actions
@@ -1498,6 +1679,15 @@ if (isset($_GET['error'])) {
             safeSetIcon('save-cat-icon', 'save');
             safeSetIcon('close-edit-modal-icon', 'close');
             safeSetIcon('update-icon', 'update');
+            // Plazos Icons
+            safeSetIcon('add-plazo-icon', 'add');
+            safeSetIcon('close-plazo-icon', 'close');
+            safeSetIcon('save-plazo-icon', 'save');
+            safeSetIcon('close-edit-plazo-icon', 'close');
+            safeSetIcon('update-plazo-icon', 'update');
+            document.querySelectorAll('[id^="edit-plazo-icon-"]').forEach(function(el) { el.innerHTML = modernUI.getIcon('edit', 'icon-sm'); });
+            document.querySelectorAll('[id^="delete-plazo-icon-"]').forEach(function(el) { el.innerHTML = modernUI.getIcon('delete', 'icon-sm'); });
+            document.querySelectorAll('[id^="toggle-plazo-icon-"]').forEach(function(el) { el.innerHTML = modernUI.getIcon('power', 'icon-sm'); });
         });
 
         // Funciones
@@ -1512,7 +1702,27 @@ if (isset($_GET['error'])) {
         }
 
         function mostrarModalAgregar() {
-            document.getElementById('modalAgregar').classList.add('active');
+            // Cargar plazos dinámicamente antes de mostrar
+            fetch('api_gestionar_datos.php?action=get_plazos')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const container = document.getElementById('add-precios-container');
+                        container.innerHTML = ''; // Limpiar
+                        data.plazos.forEach(plazo => {
+                            container.innerHTML += `
+                                <div class="form-group">
+                                    <label class="form-label">${plazo.nombre}</label>
+                                    <input type="text" name="precios[${plazo.id}]" class="form-control" onchange="formatearPrecio(this)">
+                                </div>
+                            `;
+                        });
+                        document.getElementById('modalAgregar').classList.add('active');
+                    } else {
+                        alert('Error al cargar plazos para el modal.');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
         }
 
         function mostrarModalCategoria() {
@@ -1521,6 +1731,10 @@ if (isset($_GET['error'])) {
 
         function cerrarModal(modalId) {
             document.getElementById(modalId).classList.remove('active');
+        }
+
+        function mostrarModalPlazo() {
+            document.getElementById('modalPlazo').classList.add('active');
         }
 
         function filtrarOpciones() {
@@ -1595,51 +1809,55 @@ if (isset($_GET['error'])) {
         }
 
         function editarOpcion(id) {
-            // Obtener datos de la opción
-            fetch(`api_gestionar_datos.php?action=get_opcion&id=${id}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const opcion = data.opcion;
-                        
-                        // Llenar el formulario
-                        document.getElementById('edit_id').value = opcion.id;
-                        document.getElementById('edit_categoria_id').value = opcion.categoria_id;
-                        document.getElementById('edit_nombre').value = opcion.nombre;
-                        
-                        // Formatear precios
-                        const precio90 = document.getElementById('edit_precio_90_dias');
-                        precio90.value = parseFloat(opcion.precio_90_dias || 0).toLocaleString('es-AR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
+            // Obtener los plazos y luego los datos de la opción
+            fetch('api_gestionar_datos.php?action=get_plazos')
+                .then(res => res.json())
+                .then(plazosData => {
+                    if (!plazosData.success) throw new Error('No se pudieron cargar los plazos.');
+                    
+                    fetch(`api_gestionar_datos.php?action=get_opcion&id=${id}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                const opcion = data.opcion;
+                                const precios = data.precios || {};
+                                
+                                // Llenar el formulario
+                                document.getElementById('edit_id').value = opcion.id;
+                                document.getElementById('edit_categoria_id').value = opcion.categoria_id;
+                                document.getElementById('edit_nombre').value = opcion.nombre;
+                                document.getElementById('edit_descuento').value = opcion.descuento || 0;
+
+                                // Construir campos de precios dinámicos
+                                const container = document.getElementById('edit-precios-container');
+                                container.innerHTML = '';
+                                plazosData.plazos.forEach(plazo => {
+                                    const precioExistente = precios[plazo.id] || 0;
+                                    container.innerHTML += `
+                                        <div class="form-group">
+                                            <label class="form-label">${plazo.nombre}</label>
+                                            <input type="text" name="precios[${plazo.id}]" class="form-control" value="${precioExistente}" onchange="formatearPrecio(this)">
+                                        </div>
+                                    `;
+                                });
+
+                                // Formatear los precios recién creados
+                                container.querySelectorAll('input[type="text"]').forEach(input => formatearPrecio(input));
+
+                                // Mostrar modal
+                                document.getElementById('modalEditar').classList.add('active');
+                            } else {
+                                modernUI.showToast('Error al cargar los datos de la opción', 'error');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            modernUI.showToast('Error al cargar los datos de la opción', 'error');
                         });
-                        precio90.setAttribute('data-valor', opcion.precio_90_dias || 0);
-                        
-                        const precio160 = document.getElementById('edit_precio_160_dias');
-                        precio160.value = parseFloat(opcion.precio_160_dias || 0).toLocaleString('es-AR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                        });
-                        precio160.setAttribute('data-valor', opcion.precio_160_dias || 0);
-                        
-                        const precio270 = document.getElementById('edit_precio_270_dias');
-                        precio270.value = parseFloat(opcion.precio_270_dias || 0).toLocaleString('es-AR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                        });
-                        precio270.setAttribute('data-valor', opcion.precio_270_dias || 0);
-                        
-                        document.getElementById('edit_descuento').value = opcion.descuento || 0;
-                        
-                        // Mostrar modal
-                        document.getElementById('modalEditar').classList.add('active');
-                    } else {
-                        modernUI.showToast('Error al cargar los datos de la opción', 'error');
-                    }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    modernUI.showToast('Error al cargar los datos de la opción', 'error');
+                     console.error('Error:', error);
+                     modernUI.showToast('Error al cargar los plazos', 'error');
                 });
         }
 
@@ -1648,67 +1866,44 @@ if (isset($_GET['error'])) {
             modernUI.showToast('Función de exportación en desarrollo', 'info');
         }
 
-        // Formatear precios con puntos y comas
+        // Formatear precios con puntos y comas de forma robusta
         function formatearPrecio(input) {
-            // Eliminar caracteres no numéricos excepto punto y coma
-            let valor = input.value.replace(/[^\d.,]/g, '');
-            
-            // Convertir cualquier formato a un número
-            valor = valor.replace(/\./g, '').replace(',', '.');
-            let numero = parseFloat(valor);
-            
-            if (isNaN(numero)) {
-                numero = 0;
+            let s = input.value;
+            let valorNumerico;
+
+            // 1. Convertir el valor a un número flotante estándar.
+            // Primero, quitamos los espacios y símbolos de moneda para limpiar.
+            s = String(s).replace(/[$AR\s]/g, '');
+
+            // Si el string contiene una coma, asumimos que es formato es-AR (e.g., "1.234,56")
+            if (s.includes(',')) {
+                // Quitamos los puntos de miles y reemplazamos la coma decimal por un punto.
+                valorNumerico = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+            } else {
+                // Si no hay coma, asumimos que es un formato estándar (e.g., "1234.56")
+                valorNumerico = parseFloat(s);
             }
             
-            // Formatear con 2 decimales, coma como separador decimal y punto para miles
-            input.value = numero.toLocaleString('es-AR', {
+            // Si después de todo, no es un número válido, lo tratamos como 0.
+            if (isNaN(valorNumerico)) {
+                valorNumerico = 0;
+            }
+
+            // 2. Formatear el número para la visualización en el input.
+            // Se usa el formato 'es-AR' que utiliza punto para miles y coma para decimales.
+            input.value = valorNumerico.toLocaleString('es-AR', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            
-            // Almacenar el valor numérico en un atributo para usarlo en el submit
-            input.setAttribute('data-valor', numero);
         }
         
-        // Preparar formularios antes de enviar
+        // La función prepararFormulario fue eliminada, ya que el backend ahora es el responsable
+        // de interpretar el formato 'es-AR' que envía el campo de texto.
         document.addEventListener('DOMContentLoaded', function() {
-            // Formulario de agregar
-            const formAgregar = document.querySelector('#modalAgregar form');
-            if (formAgregar) {
-                formAgregar.addEventListener('submit', function(e) {
-                    prepararFormulario(this);
-                });
-            }
-            
-            // Formulario de editar
-            const formEditar = document.querySelector('#formEditar');
-            if (formEditar) {
-                formEditar.addEventListener('submit', function(e) {
-                    prepararFormulario(this);
-                });
-            }
-            
-            // Inicializar campos de precio con formato
-            document.querySelectorAll('input[name^="precio_"]').forEach(function(input) {
-                formatearPrecio(input);
-            });
+            // Ya no se necesitan los listeners de submit que llamaban a prepararFormulario
         });
         
-        // Preparar formulario antes del envío
-        function prepararFormulario(form) {
-            form.querySelectorAll('input[name^="precio_"]').forEach(function(input) {
-                // Obtener el valor numérico almacenado o convertir el valor actual
-                let valor = input.getAttribute('data-valor');
-                if (!valor) {
-                    // Si no hay data-valor, intentar convertir
-                    valor = input.value.replace(/\./g, '').replace(',', '.');
-                    valor = parseFloat(valor) || 0;
-                }
-                // Establecer el valor numérico para el envío
-                input.value = valor;
-            });
-        }
+        // La función prepararFormulario fue eliminada.
 
         // Cerrar modales con ESC
         document.addEventListener('keydown', function(e) {
@@ -1844,6 +2039,21 @@ if (isset($_GET['error'])) {
                 alert('Error de conexión');
                 location.reload();
             });
+        }
+
+        function editarPlazo(plazo) {
+            document.getElementById('edit_plazo_id').value = plazo.id;
+            document.getElementById('edit_plazo_nombre').value = plazo.nombre;
+            document.getElementById('edit_plazo_dias').value = plazo.dias;
+            document.getElementById('edit_plazo_orden').value = plazo.orden;
+            document.getElementById('modalEditarPlazo').classList.add('active');
+        }
+
+        function eliminarPlazo(id, nombre) {
+            if (confirm(`¿Estás seguro de eliminar el plazo "${nombre}"?`)) {
+                document.getElementById('deletePlazoId').value = id;
+                document.getElementById('deletePlazoForm').submit();
+            }
         }
     </script>
 </body>

@@ -339,7 +339,7 @@ if ($isLoggedIn) {
                 </a>
                 <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
                     <span id="nav-rules-icon"></span>
-                    <span>Reglas de Exclusión (Dual)</span>
+                    <span>Reglas de Exclusión</span>
                 </a>
                 <div style="margin-top: auto; padding: var(--spacing-md);">
                     <a href="../cotizador.php" class="sidebar-item" target="_blank">
@@ -484,7 +484,7 @@ if ($isLoggedIn) {
             document.getElementById('nav-data-icon').innerHTML = modernUI.getIcon('settings');
             document.getElementById('nav-quotes-icon').innerHTML = modernUI.getIcon('document');
             document.getElementById('nav-prices-icon').innerHTML = modernUI.getIcon('dollar');
-            document.getElementById('nav-rules-icon').innerHTML = modernUI.getIcon('shield');
+            document.getElementById('nav-rules-icon').innerHTML = modernUI.getIcon('check-shield');
             document.getElementById('nav-calculator-icon').innerHTML = modernUI.getIcon('cart');
             document.getElementById('nav-logout-icon').innerHTML = modernUI.getIcon('logout');
         });

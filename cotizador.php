@@ -684,28 +684,9 @@
                 <!-- Selector de Plazo -->
                 <div class="delivery-section">
                     <h3 class="section-title">Plazo de Entrega</h3>
-                    <div class="delivery-options">
-                        <label class="delivery-option">
-                            <input type="radio" name="plazo" value="160">
-                            <div class="delivery-info">
-                                <span class="delivery-days">160-180 Días</span>
-                                <span class="delivery-label">Extendido</span>
-                            </div>
-                        </label>
-                        <label class="delivery-option selected">
-                            <input type="radio" name="plazo" value="90" checked>
-                            <div class="delivery-info">
-                                <span class="delivery-days">90 Días</span>
-                                <span class="delivery-label">Estándar</span>
-                            </div>
-                        </label>
-                        <label class="delivery-option">
-                            <input type="radio" name="plazo" value="270">
-                            <div class="delivery-info">
-                                <span class="delivery-days">270 Días</span>
-                                <span class="delivery-label">Flexible</span>
-                            </div>
-                        </label>
+                    <div class="delivery-options" id="delivery-options-container">
+                        <!-- Los plazos se cargarán aquí dinámicamente -->
+                        <p style="color: rgba(255,255,255,0.7);">Cargando plazos...</p>
                     </div>
                 </div>
 
@@ -798,8 +779,8 @@
                     <button type="button" class="btn btn-secondary" onclick="hideCustomerForm()">
                         Cancelar
                     </button>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="download-icon"></span>
+                    <button type="submit" class="btn btn-primary" id="generate-quote-btn">
+                        <span id="pdf-icon"></span>
                         Generar PDF
                     </button>
                 </div>
@@ -1297,18 +1278,19 @@
                     return `${opcion.descuento}% descuento`;
                 }
                 
-                // Obtener precio según delivery actual
-                const precio = opcion[`precio_${currentDelivery}_dias`];
+                // Obtener precio según delivery actual del nuevo objeto de precios
+                const precio = opcion.precios ? (opcion.precios[currentDelivery] || 0) : 0;
                 
                 // Verificar si hay precio válido
                 if (precio && precio > 0) {
-                    // Formatear precio de forma segura
-                    const precioFormateado = typeof modernUI !== 'undefined' && modernUI.formatCurrency 
-                        ? modernUI.formatCurrency(precio)
-                        : parseFloat(precio).toLocaleString('es-AR', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2
-                        });
+                    // Formatear precio de forma segura y robusta
+                    let valorNumerico = parseFloat(precio);
+                    if (isNaN(valorNumerico)) valorNumerico = 0;
+                    
+                    const precioFormateado = valorNumerico.toLocaleString('es-AR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
                     
                     // NUEVA FUNCIONALIDAD: Si el adicional tiene "RESTAR" en el título, mostrar con signo negativo
                     if (opcion.nombre && opcion.nombre.toLowerCase().includes('restar')) {
@@ -1740,8 +1722,8 @@
                 if (opcion.categoria_id == 3 && opcion.descuento > 0) {
                     descuentoPorcentaje = Math.max(descuentoPorcentaje, opcion.descuento);
                 } else {
-                    // IMPORTANTE: Todos los productos (ascensores y adicionales) usan el mismo plazo de entrega
-                    const precio = opcion[`precio_${currentDelivery}_dias`] || 0;
+                    // Usar el nuevo objeto de precios
+                    const precio = opcion.precios ? (opcion.precios[currentDelivery] || 0) : 0;
                     
                     // NUEVA FUNCIONALIDAD: Si el adicional tiene "RESTAR" en el título, restar el precio
                     if (opcion.nombre && opcion.nombre.toLowerCase().includes('restar')) {
@@ -1757,19 +1739,19 @@
             const descuento = subtotal * (descuentoPorcentaje / 100);
             const total = subtotal - descuento;
 
-            console.log(`Subtotal (${currentDelivery} días):`, subtotal, 'Formato:', modernUI.formatCurrency(subtotal));
-            console.log(`Total final (${currentDelivery} días):`, total, 'Formato:', modernUI.formatCurrency(total));
+            console.log(`Subtotal (${currentDelivery} días):`, subtotal, 'Formato:', (typeof modernUI !== 'undefined' ? modernUI.formatCurrency(subtotal) : subtotal.toLocaleString('es-AR')));
+            console.log(`Total final (${currentDelivery} días):`, total, 'Formato:', (typeof modernUI !== 'undefined' ? modernUI.formatCurrency(total) : total.toLocaleString('es-AR')));
 
             // Actualizar UI
-            document.getElementById('subtotal').textContent = `AR$${modernUI.formatCurrency(subtotal)}`;
-            document.getElementById('total-amount').textContent = `AR$${modernUI.formatCurrency(total)}`;
+            document.getElementById('subtotal').textContent = `AR$${total.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('total-amount').textContent = `AR$${total.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             
             const discountRow = document.getElementById('discount-row');
             const discountElement = document.getElementById('discount');
             
             if (descuentoPorcentaje > 0) {
                 discountRow.style.display = 'flex';
-                discountElement.textContent = `-AR$${modernUI.formatCurrency(descuento)} (${descuentoPorcentaje}%)`;
+                discountElement.textContent = `-AR$${descuento.toLocaleString('es-AR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${descuentoPorcentaje}%)`;
             } else {
                 discountRow.style.display = 'none';
             }
@@ -1973,6 +1955,62 @@
             
             // Configurar nuevamente los listeners directos
             setupDirectListeners();
+        });
+
+        // Cargar Plazos de Entrega Dinámicamente
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('api/get_plazos.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.plazos.length > 0) {
+                        const container = document.getElementById('delivery-options-container');
+                        container.innerHTML = ''; // Limpiar 'cargando...'
+                        
+                        // Establecer el plazo por defecto al primer elemento de la lista
+                        if (data.plazos[0]) {
+                            currentDelivery = data.plazos[0].dias;
+                        }
+
+                        data.plazos.forEach((plazo, index) => {
+                            const label = document.createElement('label');
+                            label.className = 'delivery-option';
+                            if (index === 0) { // Marcar el primero como seleccionado por defecto
+                                label.classList.add('selected');
+                            }
+                            label.innerHTML = `
+                                <input type="radio" name="plazo" value="${plazo.dias}" ${index === 0 ? 'checked' : ''}>
+                                <div class="delivery-info">
+                                    <span class="delivery-days">${plazo.nombre}</span>
+                                    <span class="delivery-label">${plazo.dias} Días</span>
+                                </div>
+                            `;
+                            container.appendChild(label);
+                        });
+
+                        // Añadir event listeners a las nuevas opciones
+                        document.querySelectorAll('.delivery-option input').forEach(input => {
+                            input.addEventListener('change', function() {
+                                currentDelivery = this.value;
+                                document.querySelectorAll('.delivery-option').forEach(opt => opt.classList.remove('selected'));
+                                this.closest('.delivery-option').classList.add('selected');
+                                // Ya no se llama a calculateTotal, sino a las funciones más nuevas
+                                actualizarPreciosPorPlazo();
+                                updateTotals();
+                                updateSelectedItems();
+                            });
+                        });
+                        
+                        // Recalcular el total inicial con el plazo por defecto
+                        updateTotals();
+
+                    } else {
+                         document.getElementById('delivery-options-container').innerHTML = '<p style="color:red;">No hay plazos de entrega disponibles.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error al cargar plazos:', error);
+                    document.getElementById('delivery-options-container').innerHTML = '<p style="color:red;">Error al cargar plazos.</p>';
+                });
         });
     </script>
 </body>

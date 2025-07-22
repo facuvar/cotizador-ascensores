@@ -152,21 +152,47 @@ try {
                 break;
             }
             
+            // Obtener datos principales de la opción
             $stmt = $conn->prepare("SELECT * FROM opciones WHERE id = ?");
             $stmt->bind_param("i", $id);
             $stmt->execute();
             $result = $stmt->get_result();
             
             if ($opcion = $result->fetch_assoc()) {
+                // Ahora, obtener los precios asociados desde la nueva tabla
+                $precios = [];
+                $stmt_precios = $conn->prepare("SELECT plazo_id, precio FROM opciones_precios WHERE opcion_id = ?");
+                $stmt_precios->bind_param("i", $id);
+                $stmt_precios->execute();
+                $result_precios = $stmt_precios->get_result();
+                
+                while($row = $result_precios->fetch_assoc()){
+                    $precios[$row['plazo_id']] = $row['precio'];
+                }
+
                 $response = [
                     'success' => true,
-                    'opcion' => $opcion
+                    'opcion' => $opcion,
+                    'precios' => $precios // Añadir los precios a la respuesta
                 ];
-                error_log("✅ Opción encontrada ID: " . $id);
+                error_log("✅ Opción encontrada ID: " . $id . " con " . count($precios) . " precios.");
             } else {
                 $response = ['success' => false, 'error' => 'Opción no encontrada'];
                 error_log("❌ Opción no encontrada ID: " . $id);
             }
+            break;
+        
+        case 'get_plazos':
+            $stmt = $conn->prepare("SELECT id, nombre, dias, orden FROM plazos_entrega WHERE activo = 1 ORDER BY orden ASC");
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $plazos = $result->fetch_all(MYSQLI_ASSOC);
+            
+            $response = [
+                'success' => true,
+                'plazos' => $plazos
+            ];
+            error_log("✅ Obtenidos " . count($plazos) . " plazos activos.");
             break;
             
         default:

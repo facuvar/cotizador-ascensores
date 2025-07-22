@@ -82,40 +82,49 @@ try {
         throw new Exception('Error al obtener categorías: ' . $conn->error);
     }
     
-    // Obtener opciones con categorías ordenadas por campo orden
+    // Obtener todas las opciones y sus precios asociados
     $opciones = [];
-    $query = "SELECT o.*, c.nombre as categoria_nombre, c.orden as categoria_orden
-              FROM opciones o 
-              LEFT JOIN categorias c ON o.categoria_id = c.id 
-              ORDER BY c.orden ASC, o.orden ASC, o.nombre ASC";
+    $query = "
+        SELECT 
+            o.id, o.categoria_id, o.nombre, o.descuento, o.orden,
+            c.nombre as categoria_nombre, c.orden as categoria_orden,
+            p.id as plazo_id, p.dias as plazo_dias, op.precio
+        FROM opciones o
+        LEFT JOIN categorias c ON o.categoria_id = c.id
+        LEFT JOIN opciones_precios op ON o.id = op.opcion_id
+        LEFT JOIN plazos_entrega p ON op.plazo_id = p.id AND p.activo = 1
+        ORDER BY c.orden ASC, o.orden ASC, o.nombre ASC, p.orden ASC
+    ";
     
     $result = $conn->query($query);
     
     if ($result) {
-        $ascensores_count = 0;
+        $temp_opciones = [];
         while ($row = $result->fetch_assoc()) {
-            $opciones[] = [
-                'id' => (int)$row['id'],
-                'categoria_id' => (int)$row['categoria_id'],
-                'categoria_nombre' => $row['categoria_nombre'],
-                'categoria_orden' => (int)($row['categoria_orden'] ?? 0),
-                'nombre' => $row['nombre'],
-                'precio_90_dias' => (float)($row['precio_90_dias'] ?? 0),
-                'precio_160_dias' => (float)($row['precio_160_dias'] ?? 0),
-                'precio_270_dias' => (float)($row['precio_270_dias'] ?? 0),
-                'descuento' => (int)($row['descuento'] ?? 0),
-                'orden' => (int)($row['orden'] ?? 0)
-            ];
-            
-            // Contar ascensores
-            if ((int)$row['categoria_id'] === 1) {
-                $ascensores_count++;
+            $opcion_id = (int)$row['id'];
+            if (!isset($temp_opciones[$opcion_id])) {
+                $temp_opciones[$opcion_id] = [
+                    'id' => $opcion_id,
+                    'categoria_id' => (int)$row['categoria_id'],
+                    'categoria_nombre' => $row['categoria_nombre'],
+                    'categoria_orden' => (int)($row['categoria_orden'] ?? 0),
+                    'nombre' => $row['nombre'],
+                    'descuento' => (int)($row['descuento'] ?? 0),
+                    'orden' => (int)($row['orden'] ?? 0),
+                    'precios' => [] // Inicializar array de precios
+                ];
+            }
+            // Añadir precio si existe para un plazo activo
+            if ($row['plazo_id'] && $row['precio'] !== null) {
+                $temp_opciones[$opcion_id]['precios'][$row['plazo_dias']] = (float)$row['precio'];
             }
         }
         
+        // Convertir el array asociativo a uno indexado
+        $opciones = array_values($temp_opciones);
+        
         // Log de depuración
         error_log("API: Total opciones devueltas: " . count($opciones));
-        error_log("API: Opciones de ascensores (categoria_id=1): " . $ascensores_count);
         
     } else {
         throw new Exception('Error al obtener opciones: ' . $conn->error);
