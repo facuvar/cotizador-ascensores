@@ -321,23 +321,23 @@ if ($isLoggedIn) {
             </div>
             
             <nav class="sidebar-menu">
-                <a href="index.php" class="sidebar-item active">
+                <a href="https://quotedesk.kubeagency.co/admin/index.php" class="sidebar-item active">
                     <span id="nav-dashboard-icon"></span>
                     <span>Dashboard</span>
                 </a>
-                <a href="gestionar_datos.php" class="sidebar-item">
+                <a href="https://quotedesk.kubeagency.co/admin/gestionar_datos.php" class="sidebar-item">
                     <span id="nav-data-icon"></span>
                     <span>Gestionar Datos</span>
                 </a>
-                <a href="presupuestos.php" class="sidebar-item">
+                <a href="https://quotedesk.kubeagency.co/admin/presupuestos.php" class="sidebar-item">
                     <span id="nav-quotes-icon"></span>
                     <span>Presupuestos</span>
                 </a>
-                <a href="ajustar_precios.php" class="sidebar-item">
+                <a href="https://quotedesk.kubeagency.co/admin/ajustar_precios.php" class="sidebar-item">
                     <span id="nav-prices-icon"></span>
                     <span>Ajustar Precios</span>
                 </a>
-                <a href="gestionar_reglas_exclusion_dual.php" class="sidebar-item">
+                <a href="https://quotedesk.kubeagency.co/admin/gestionar_reglas_exclusion_dual.php" class="sidebar-item">
                     <span id="nav-rules-icon"></span>
                     <span>Reglas de Exclusión</span>
                 </a>
